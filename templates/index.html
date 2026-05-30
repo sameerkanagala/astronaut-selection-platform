@@ -292,10 +292,22 @@
     .flag-item.disagreement { background:#fef2f2; color:#991b1b; }
     .flag-item.ok { background:#f0fdf4; color:#166534; }
 
-    /* ── Section divider ─────────────────────────────────────── */
-    .policy-divider { font-size:10px; font-weight:700; text-transform:uppercase;
-                      letter-spacing:.07em; color:#5a85a8; padding:6px 0 4px;
-                      border-top:1px solid rgba(255,255,255,.1); margin-top:6px; }
+    /* ── Accordion ───────────────────────────────────────────── */
+    .acc { border-top:1px solid rgba(255,255,255,.10); }
+    .acc-hdr {
+      width:100%; display:flex; justify-content:space-between; align-items:center;
+      padding:10px 0; background:none; border:none; color:#8aabcc;
+      font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
+      cursor:pointer; transition:color .15s;
+    }
+    .acc-hdr:hover { color:#d0e4f5; }
+    .acc.open .acc-hdr { color:#fff; }
+    .acc-body { display:none; padding-bottom:8px; }
+    .acc.open .acc-body { display:block; }
+    .acc-chev { font-size:13px; transition:transform .2s; opacity:.6; }
+    .acc.open .acc-chev { transform:rotate(180deg); opacity:1; }
+    .always-section { border-top:1px solid rgba(255,255,255,.10);
+                      margin-top:4px; padding-top:10px; }
 
     /* ── Utility ──────────────────────────────────────────────── */
     .hidden { display: none !important; }
@@ -328,7 +340,7 @@
     </div>
     <div class="sidebar-body">
 
-      <!-- Mode -->
+      <!-- ── Always visible: Run Settings ──────────────────────── -->
       <div class="field">
         <label>Run Mode</label>
         <div class="toggle-row">
@@ -336,197 +348,226 @@
           <button class="toggle-btn"        id="btn-live" onclick="setMode('live')">Live Claude</button>
         </div>
       </div>
-
-      <!-- API Key (live only) -->
       <div class="field hidden" id="apikey-field">
         <label>Anthropic API Key</label>
         <input type="password" id="api-key" placeholder="sk-ant-api03-…">
       </div>
-
-      <!-- Model (live only) -->
       <div class="field hidden" id="model-field">
         <label>Model</label>
         <select id="model-select">
-          <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 (fastest / cheapest)</option>
+          <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 (fastest)</option>
           <option value="claude-sonnet-4-6">Claude Sonnet 4.6 (balanced)</option>
           <option value="claude-opus-4-6">Claude Opus 4.6 (most capable)</option>
         </select>
       </div>
 
-      <!-- Program Policy -->
-      <div class="policy-divider">Program Policy</div>
-
-      <div class="field">
-        <label>Program Preset</label>
-        <select id="preset-select" onchange="applyPreset(this.value)">
-          <option value="high_volume">High-Volume Merit Scholarship</option>
-          <option value="high_dollar">High-Dollar Grant Program</option>
-          <option value="regulatory">Regulatory / Compliance</option>
-          <option value="custom">Custom</option>
-        </select>
-      </div>
-
-      <div class="field" id="preset-desc-wrap">
-        <small style="font-size:10px;color:#6a9bbf;line-height:1.5;display:block" id="preset-desc">
-          Large applicant pool. AI automation encouraged for clear-cut cases.
-        </small>
-      </div>
-
-      <!-- Confidence thresholds -->
-      <div class="field">
-        <label>High Confidence Threshold
-          <span class="slider-val" id="high-val">0.78</span>
-        </label>
-        <div class="slider-wrap">
-          <input type="range" id="high-thresh" min="0.5" max="0.99" step="0.01" value="0.78"
-                 oninput="updateSlider('high');markCustom()">
-          <div class="slider-labels"><span>0.50</span><span>0.99</span></div>
-        </div>
-        <small style="font-size:10px;color:#5a85a8;display:block;margin-top:2px">≥ this → auto decision</small>
-      </div>
-
-      <div class="field">
-        <label>Low Confidence Threshold
-          <span class="slider-val" id="low-val">0.50</span>
-        </label>
-        <div class="slider-wrap">
-          <input type="range" id="low-thresh" min="0.1" max="0.79" step="0.01" value="0.50"
-                 oninput="updateSlider('low');markCustom()">
-          <div class="slider-labels"><span>0.10</span><span>0.79</span></div>
-        </div>
-        <small style="font-size:10px;color:#5a85a8;display:block;margin-top:2px">< this → escalation path</small>
-      </div>
-
-      <!-- Decision Sensitivity -->
-      <div class="field">
-        <label>Award Sensitivity</label>
-        <div class="toggle-row">
-          <button class="toggle-btn active" id="sens-low"    onclick="setAwardSens('low',this)">Low</button>
-          <button class="toggle-btn"        id="sens-medium" onclick="setAwardSens('medium',this)">Medium</button>
-          <button class="toggle-btn"        id="sens-high"   onclick="setAwardSens('high',this)">High</button>
+      <!-- ── 1. Program Policy ──────────────────────────────────── -->
+      <div class="acc open" id="acc-policy">
+        <button class="acc-hdr" onclick="openAcc('policy')">
+          <span>🏛 Program Policy</span><span class="acc-chev">▾</span>
+        </button>
+        <div class="acc-body">
+          <div class="field">
+            <label>Preset</label>
+            <select id="preset-select" onchange="applyPreset(this.value)">
+              <option value="high_volume">High-Volume Merit Scholarship</option>
+              <option value="high_dollar">High-Dollar Grant Program</option>
+              <option value="regulatory">Regulatory / Compliance</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          <div class="field">
+            <small style="font-size:10px;color:#6a9bbf;line-height:1.5;display:block" id="preset-desc">
+              Large applicant pool. AI automation encouraged for clear-cut cases.
+            </small>
+          </div>
         </div>
       </div>
 
-      <div class="field">
-        <label>Cutoff Zone <span class="slider-val" id="cutoff-val">5</span> pts
-        </label>
-        <div class="slider-wrap">
-          <input type="range" id="cutoff-zone" min="2" max="15" step="1" value="5"
-                 oninput="document.getElementById('cutoff-val').textContent=this.value;markCustom()">
-          <div class="slider-labels"><span>2</span><span>15</span></div>
-        </div>
-        <small style="font-size:10px;color:#5a85a8;display:block;margin-top:2px">Score within this of boundary → high sensitivity</small>
-      </div>
-
-      <!-- Disagreement -->
-      <div class="field">
-        <label>Disagreement Tolerance
-          <span class="slider-val" id="disagree-val">0.45</span>
-        </label>
-        <div class="slider-wrap">
-          <input type="range" id="disagree-thresh" min="0.15" max="0.80" step="0.05" value="0.45"
-                 oninput="document.getElementById('disagree-val').textContent=parseFloat(this.value).toFixed(2);markCustom()">
-          <div class="slider-labels"><span>0.15</span><span>0.80</span></div>
-        </div>
-        <small style="font-size:10px;color:#5a85a8;display:block;margin-top:2px">Above this → escalate</small>
-      </div>
-
-      <!-- Disagreement simulation — grouped with tolerance -->
-      <div class="policy-divider">Disagreement Simulation</div>
-
-      <div class="field">
-        <label>Reviewer Strictness
-          <span class="slider-val" id="strictness-val">0.20</span>
-        </label>
-        <div class="slider-wrap">
-          <input type="range" id="strictness" min="0" max="1" step="0.05" value="0.20"
-                 oninput="document.getElementById('strictness-val').textContent=parseFloat(this.value).toFixed(2);markCustom()">
-          <div class="slider-labels"><span>0 Generous</span><span>1 Strict</span></div>
-        </div>
-      </div>
-
-      <div class="field">
-        <label>Disagreement Rate
-          <span class="slider-val" id="dis-rate-val">0.25</span>
-        </label>
-        <div class="slider-wrap">
-          <input type="range" id="dis-rate" min="0" max="0.90" step="0.05" value="0.25"
-                 oninput="document.getElementById('dis-rate-val').textContent=parseFloat(this.value).toFixed(2);markCustom()">
-          <div class="slider-labels"><span>0 Never</span><span>0.90 Often</span></div>
-        </div>
-        <small style="font-size:10px;color:#5a85a8;display:block;margin-top:2px">Probability borderline cases trigger human override</small>
-      </div>
-
-      <div class="field">
-        <label>Reviewer Score Noise σ
-          <span class="slider-val" id="noise-val">2.5</span>
-        </label>
-        <div class="slider-wrap">
-          <input type="range" id="noise-sigma" min="0.5" max="6" step="0.5" value="2.5"
-                 oninput="document.getElementById('noise-val').textContent=parseFloat(this.value).toFixed(1);markCustom()">
-          <div class="slider-labels"><span>0.5</span><span>6.0</span></div>
-        </div>
-        <small style="font-size:10px;color:#5a85a8;display:block;margin-top:2px">Higher = more score variance between reviewers</small>
-      </div>
-
-      <!-- Escalation thresholds -->
-      <div class="policy-divider">Escalation Thresholds</div>
-
-      <div class="field">
-        <label>Escalation Threshold
-          <span class="slider-val" id="esc-val">0.55</span>
-        </label>
-        <div class="slider-wrap">
-          <input type="range" id="esc-thresh" min="0.30" max="0.85" step="0.05" value="0.55"
-                 oninput="document.getElementById('esc-val').textContent=parseFloat(this.value).toFixed(2);markCustom()">
-          <div class="slider-labels"><span>0.30</span><span>0.85</span></div>
-        </div>
-        <small style="font-size:10px;color:#5a85a8;display:block;margin-top:2px">Composite risk → Escalation</small>
-      </div>
-
-      <div class="field">
-        <label>Senior Adjudication Threshold
-          <span class="slider-val" id="senior-val">0.75</span>
-        </label>
-        <div class="slider-wrap">
-          <input type="range" id="senior-thresh" min="0.50" max="0.99" step="0.05" value="0.75"
-                 oninput="document.getElementById('senior-val').textContent=parseFloat(this.value).toFixed(2);markCustom()">
-          <div class="slider-labels"><span>0.50</span><span>0.99</span></div>
-        </div>
-        <small style="font-size:10px;color:#5a85a8;display:block;margin-top:2px">Composite risk → Senior Adjudication</small>
-      </div>
-
-      <!-- Oversight toggles -->
-      <div class="policy-divider">Oversight</div>
-
-      <div class="field">
-        <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer">
-          <span>Require human near cutoff</span>
-          <input type="checkbox" id="human-cutoff" onchange="markCustom()" style="width:auto;accent-color:var(--blue)">
-        </label>
-        <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;margin-top:6px">
-          <span>Senior adjudication enabled</span>
-          <input type="checkbox" id="senior-enabled" checked onchange="markCustom()" style="width:auto;accent-color:var(--blue)">
-        </label>
-      </div>
-
-      <!-- Applicants -->
-      <div class="field">
-        <label>Applicants</label>
-        <div class="select-all-row">
-          <input type="checkbox" id="select-all" checked onchange="toggleAll(this)">
-          <label for="select-all">Select all</label>
-        </div>
-        <div class="app-list" id="app-list">
-          <!-- Populated by JS -->
+      <!-- ── 2. Confidence & Routing ────────────────────────────── -->
+      <div class="acc" id="acc-confidence">
+        <button class="acc-hdr" onclick="openAcc('confidence')">
+          <span>🎯 Confidence & Routing</span><span class="acc-chev">▾</span>
+        </button>
+        <div class="acc-body">
+          <div class="field">
+            <label>High Confidence <span class="slider-val" id="high-val">0.78</span></label>
+            <div class="slider-wrap">
+              <input type="range" id="high-thresh" min="0.5" max="0.99" step="0.01" value="0.78"
+                     oninput="updateSlider('high');markCustom()">
+              <div class="slider-labels"><span>0.50</span><span>0.99</span></div>
+            </div>
+            <small style="font-size:10px;color:#5a85a8;display:block;margin-top:2px">≥ this → auto decision</small>
+          </div>
+          <div class="field">
+            <label>Low Confidence <span class="slider-val" id="low-val">0.50</span></label>
+            <div class="slider-wrap">
+              <input type="range" id="low-thresh" min="0.1" max="0.79" step="0.01" value="0.50"
+                     oninput="updateSlider('low');markCustom()">
+              <div class="slider-labels"><span>0.10</span><span>0.79</span></div>
+            </div>
+            <small style="font-size:10px;color:#5a85a8;display:block;margin-top:2px">< this → escalation path</small>
+          </div>
+          <div class="field">
+            <label>Escalation Threshold <span class="slider-val" id="esc-val">0.55</span></label>
+            <div class="slider-wrap">
+              <input type="range" id="esc-thresh" min="0.30" max="0.85" step="0.05" value="0.55"
+                     oninput="document.getElementById('esc-val').textContent=parseFloat(this.value).toFixed(2);markCustom()">
+              <div class="slider-labels"><span>0.30</span><span>0.85</span></div>
+            </div>
+            <small style="font-size:10px;color:#5a85a8;display:block;margin-top:2px">Composite risk → Escalation</small>
+          </div>
+          <div class="field">
+            <label>Senior Adj. Threshold <span class="slider-val" id="senior-val">0.75</span></label>
+            <div class="slider-wrap">
+              <input type="range" id="senior-thresh" min="0.50" max="0.99" step="0.05" value="0.75"
+                     oninput="document.getElementById('senior-val').textContent=parseFloat(this.value).toFixed(2);markCustom()">
+              <div class="slider-labels"><span>0.50</span><span>0.99</span></div>
+            </div>
+            <small style="font-size:10px;color:#5a85a8;display:block;margin-top:2px">Composite risk → Senior Adjudication</small>
+          </div>
         </div>
       </div>
 
-      <!-- Run button -->
-      <button class="run-btn" id="run-btn" onclick="runEvaluation()">
-        <span id="run-icon">▶</span>
-        <span id="run-label">Run Evaluation</span>
-      </button>
+      <!-- ── 3. Decision Sensitivity ────────────────────────────── -->
+      <div class="acc" id="acc-sensitivity">
+        <button class="acc-hdr" onclick="openAcc('sensitivity')">
+          <span>⚡ Decision Sensitivity</span><span class="acc-chev">▾</span>
+        </button>
+        <div class="acc-body">
+          <div class="field">
+            <label>Award Sensitivity</label>
+            <div class="toggle-row">
+              <button class="toggle-btn active" id="sens-low"    onclick="setAwardSens('low',this)">Low</button>
+              <button class="toggle-btn"        id="sens-medium" onclick="setAwardSens('medium',this)">Medium</button>
+              <button class="toggle-btn"        id="sens-high"   onclick="setAwardSens('high',this)">High</button>
+            </div>
+          </div>
+          <div class="field">
+            <label>Cutoff Zone <span class="slider-val" id="cutoff-val">5</span> pts</label>
+            <div class="slider-wrap">
+              <input type="range" id="cutoff-zone" min="2" max="15" step="1" value="5"
+                     oninput="document.getElementById('cutoff-val').textContent=this.value;markCustom()">
+              <div class="slider-labels"><span>2</span><span>15</span></div>
+            </div>
+            <small style="font-size:10px;color:#5a85a8;display:block;margin-top:2px">Score within this of boundary → high sensitivity</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 4. Signal Hierarchy ────────────────────────────────── -->
+      <div class="acc" id="acc-hierarchy">
+        <button class="acc-hdr" onclick="openAcc('hierarchy')">
+          <span>⚖ Signal Hierarchy</span><span class="acc-chev">▾</span>
+        </button>
+        <div class="acc-body">
+          <div style="font-size:10px;color:#6a9bbf;line-height:1.5;margin-bottom:8px">
+            Prevents over-indexing on unverifiable qualitative signals (essay, leadership)
+            vs structured quantitative data (GPA, financial records).
+          </div>
+          <div class="field">
+            <label>Quantitative Weight <span class="slider-val" id="quant-val">50%</span></label>
+            <div class="slider-wrap">
+              <input type="range" id="quant-weight" min="0.40" max="0.80" step="0.05" value="0.50"
+                     oninput="updateQuantWeight(this.value);markCustom()">
+              <div class="slider-labels"><span>40% balanced</span><span>80% quant</span></div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:2px">
+            <div style="background:rgba(46,117,182,.15);border:1px solid rgba(46,117,182,.3);border-radius:6px;padding:7px 8px">
+              <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#5a9fd4;margin-bottom:3px">🔢 Quantitative</div>
+              <div style="font-size:10px;color:#aac8e0">Academic / GPA</div>
+              <div style="font-size:10px;color:#aac8e0">Financial Need</div>
+              <div style="font-size:9px;color:#5a85a8;margin-top:3px;font-style:italic">Verifiable data</div>
+            </div>
+            <div style="background:rgba(0,112,128,.15);border:1px solid rgba(0,112,128,.3);border-radius:6px;padding:7px 8px">
+              <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#4aa8b4;margin-bottom:3px">📝 Qualitative</div>
+              <div style="font-size:10px;color:#aac8e0">Leadership</div>
+              <div style="font-size:10px;color:#aac8e0">Essay Quality</div>
+              <div style="font-size:9px;color:#5a85a8;margin-top:3px;font-style:italic">Unverifiable signals</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 5. Disagreement Controls ───────────────────────────── -->
+      <div class="acc" id="acc-disagreement">
+        <button class="acc-hdr" onclick="openAcc('disagreement')">
+          <span>🔀 Disagreement Controls</span><span class="acc-chev">▾</span>
+        </button>
+        <div class="acc-body">
+          <div class="field">
+            <label>Disagreement Tolerance <span class="slider-val" id="disagree-val">0.45</span></label>
+            <div class="slider-wrap">
+              <input type="range" id="disagree-thresh" min="0.15" max="0.80" step="0.05" value="0.45"
+                     oninput="document.getElementById('disagree-val').textContent=parseFloat(this.value).toFixed(2);markCustom()">
+              <div class="slider-labels"><span>0.15</span><span>0.80</span></div>
+            </div>
+            <small style="font-size:10px;color:#5a85a8;display:block;margin-top:2px">Above this → escalate</small>
+          </div>
+          <div class="field">
+            <label>Reviewer Strictness <span class="slider-val" id="strictness-val">0.20</span></label>
+            <div class="slider-wrap">
+              <input type="range" id="strictness" min="0" max="1" step="0.05" value="0.20"
+                     oninput="document.getElementById('strictness-val').textContent=parseFloat(this.value).toFixed(2);markCustom()">
+              <div class="slider-labels"><span>0 Generous</span><span>1 Strict</span></div>
+            </div>
+          </div>
+          <div class="field">
+            <label>Disagreement Rate <span class="slider-val" id="dis-rate-val">0.25</span></label>
+            <div class="slider-wrap">
+              <input type="range" id="dis-rate" min="0" max="0.90" step="0.05" value="0.25"
+                     oninput="document.getElementById('dis-rate-val').textContent=parseFloat(this.value).toFixed(2);markCustom()">
+              <div class="slider-labels"><span>0 Never</span><span>0.90 Often</span></div>
+            </div>
+            <small style="font-size:10px;color:#5a85a8;display:block;margin-top:2px">Probability borderline cases trigger human override</small>
+          </div>
+          <div class="field">
+            <label>Score Noise σ <span class="slider-val" id="noise-val">2.5</span></label>
+            <div class="slider-wrap">
+              <input type="range" id="noise-sigma" min="0.5" max="6" step="0.5" value="2.5"
+                     oninput="document.getElementById('noise-val').textContent=parseFloat(this.value).toFixed(1);markCustom()">
+              <div class="slider-labels"><span>0.5</span><span>6.0</span></div>
+            </div>
+            <small style="font-size:10px;color:#5a85a8;display:block;margin-top:2px">Higher = more variance between reviewers</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 6. Oversight ───────────────────────────────────────── -->
+      <div class="acc" id="acc-oversight">
+        <button class="acc-hdr" onclick="openAcc('oversight')">
+          <span>🛡 Oversight</span><span class="acc-chev">▾</span>
+        </button>
+        <div class="acc-body">
+          <div class="field">
+            <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+              <span>Require human near cutoff</span>
+              <input type="checkbox" id="human-cutoff" onchange="markCustom()" style="width:auto;accent-color:var(--blue)">
+            </label>
+            <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;margin-top:8px">
+              <span>Senior adjudication enabled</span>
+              <input type="checkbox" id="senior-enabled" checked onchange="markCustom()" style="width:auto;accent-color:var(--blue)">
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Always visible: Applicants + Run ──────────────────── -->
+      <div class="always-section">
+        <div class="field">
+          <label>Applicants</label>
+          <div class="select-all-row">
+            <input type="checkbox" id="select-all" checked onchange="toggleAll(this)">
+            <label for="select-all">Select all</label>
+          </div>
+          <div class="app-list" id="app-list"></div>
+        </div>
+        <button class="run-btn" id="run-btn" onclick="runEvaluation()">
+          <span id="run-icon">▶</span>
+          <span id="run-label">Run Evaluation</span>
+        </button>
+      </div>
 
     </div><!-- /sidebar-body -->
   </aside>
@@ -633,6 +674,19 @@ function renderAppList(apps) {
 }
 
 // ── Settings ──────────────────────────────────────────────────────────────────
+// ── Accordion ─────────────────────────────────────────────────────────────────
+function openAcc(id) {
+  document.querySelectorAll('.acc').forEach(a => a.classList.remove('open'));
+  const el = document.getElementById('acc-' + id);
+  if (el) el.classList.add('open');
+}
+
+function updateQuantWeight(val) {
+  const pct = Math.round(parseFloat(val) * 100);
+  document.getElementById('quant-val').textContent = pct + '%';
+}
+
+// ── Mode ──────────────────────────────────────────────────────────────────────
 function setMode(m) {
   mode = m;
   document.getElementById('btn-stub').classList.toggle('active', m === 'stub');
@@ -677,6 +731,10 @@ function applyPreset(key) {
     document.getElementById('noise-sigma').value        = p.reviewer_noise_sigma;
     document.getElementById('noise-val').textContent    = p.reviewer_noise_sigma.toFixed(1);
   }
+  if (p.quant_weight != null) {
+    document.getElementById('quant-weight').value = p.quant_weight;
+    updateQuantWeight(p.quant_weight);
+  }
   awardSensitivity = p.award_sensitivity;
   ['low','medium','high'].forEach(s => {
     document.getElementById('sens-'+s).classList.toggle('active', s === p.award_sensitivity);
@@ -704,6 +762,7 @@ function getPolicy() {
     reviewer_strictness:        parseFloat(document.getElementById('strictness').value),
     disagreement_sim_rate:      parseFloat(document.getElementById('dis-rate').value),
     reviewer_noise_sigma:       parseFloat(document.getElementById('noise-sigma').value),
+    quant_weight:               parseFloat(document.getElementById('quant-weight').value),
   };
 }
 
@@ -1036,18 +1095,150 @@ function buildAuditPanel(d) {
   const sigTab = sig.composite_risk != null ? buildSignalTab(sig, d.review_type) :
     '<p style="padding:16px;color:#aaa;font-size:12px">No signal data available.</p>';
 
+  // ── Tab: Rubric ───────────────────────────────────────────────
+  const qw = getPolicy ? getPolicy().quant_weight : 0.50;
+  const rubricTab = buildRubricTab(d, qw);
+
   return `<div class="audit-panel">
     <div class="tab-bar">
       <button class="tab-btn active" onclick="switchTab('${uid}','app',this)">📋 Application</button>
-      <button class="tab-btn"        onclick="switchTab('${uid}','scores',this)">📊 Scores & Evidence</button>
-      <button class="tab-btn"        onclick="switchTab('${uid}','signals',this)">⚡ Signals & Routing</button>
-      <button class="tab-btn"        onclick="switchTab('${uid}','trail',this)">🔍 Audit Trail</button>
+      <button class="tab-btn"        onclick="switchTab('${uid}','rubric',this)">📐 Rubric</button>
+      <button class="tab-btn"        onclick="switchTab('${uid}','scores',this)">📊 Scores</button>
+      <button class="tab-btn"        onclick="switchTab('${uid}','signals',this)">⚡ Signals</button>
+      <button class="tab-btn"        onclick="switchTab('${uid}','trail',this)">🔍 Audit</button>
     </div>
     <div class="tab-pane active" id="tab-${uid}-app">${appTab}</div>
+    <div class="tab-pane"        id="tab-${uid}-rubric">${rubricTab}</div>
     <div class="tab-pane"        id="tab-${uid}-scores">${scoresTab}</div>
     <div class="tab-pane"        id="tab-${uid}-signals">${sigTab}</div>
     <div class="tab-pane"        id="tab-${uid}-trail">${steps}</div>
   </div>`;
+}
+
+function buildRubricTab(d, quantWeight) {
+  const qualWeight = 1 - quantWeight;
+  const qwPct  = Math.round(quantWeight * 100);
+  const qlwPct = Math.round(qualWeight  * 100);
+
+  // Effective max points per dimension after hierarchy weighting
+  const qMax  = 25 * quantWeight * 2;   // each quant dim weighted
+  const qlMax = 25 * qualWeight  * 2;   // each qual dim weighted
+
+  const dims = [
+    { name:'Academic Achievement', type:'quant', icon:'🔢', score:d.rubric.academic,
+      maxRaw:25, weight:quantWeight,
+      criteria:[
+        {band:'22–25', desc:'GPA ≥ 3.8, rigorous coursework, multiple awards or honours'},
+        {band:'17–21', desc:'GPA 3.4–3.79, solid performance, some academic recognition'},
+        {band:'12–16', desc:'GPA 3.0–3.39, average performance, limited recognition'},
+        {band:'7–11',  desc:'GPA 2.5–2.99, below average, improvement trajectory noted'},
+        {band:'0–6',   desc:'GPA < 2.5 with no mitigating context; significant concerns'},
+      ]},
+    { name:'Financial Need', type:'quant', icon:'🔢', score:d.rubric.financial,
+      maxRaw:25, weight:quantWeight,
+      criteria:[
+        {band:'22–25', desc:'Household income < $30k, multiple dependents, documented hardship'},
+        {band:'17–21', desc:'Income $30–45k, some dependents, moderate demonstrated need'},
+        {band:'12–16', desc:'Income $45–70k, limited dependents, some financial pressure'},
+        {band:'7–11',  desc:'Income $70–100k, minimal demonstrated financial need'},
+        {band:'0–6',   desc:'Income > $100k, no meaningful financial need documented'},
+      ]},
+    { name:'Leadership & Service', type:'qual', icon:'📝', score:d.rubric.leadership,
+      maxRaw:25, weight:qualWeight,
+      criteria:[
+        {band:'22–25', desc:'Founded or led organizations, 150+ documented service hours, measurable community impact'},
+        {band:'17–21', desc:'Named leadership roles in 2+ activities, 100+ hours, some impact documented'},
+        {band:'12–16', desc:'Active participant in activities, some service, limited leadership'},
+        {band:'7–11',  desc:'Minimal extracurricular involvement, few service hours'},
+        {band:'0–6',   desc:'No documented leadership, service, or community engagement'},
+      ]},
+    { name:'Essay Quality', type:'qual', icon:'📝', score:d.rubric.essay,
+      maxRaw:25, weight:qualWeight,
+      criteria:[
+        {band:'22–25', desc:'Specific, authentic, compelling narrative — clear purpose, vivid detail, persuasive voice'},
+        {band:'17–21', desc:'Personal and clear with meaningful specificity, believable motivation'},
+        {band:'12–16', desc:'Adequate essay with some personal detail, generally coherent'},
+        {band:'7–11',  desc:'Generic or vague, lacks concrete detail or personal narrative'},
+        {band:'0–6',   desc:'Minimal effort, no personal narrative, template-like or near-empty'},
+      ]},
+  ];
+
+  const thresholds = `
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+      <div style="flex:1;min-width:80px;background:#e8f5e9;border:1px solid #a5d6a7;border-radius:6px;padding:8px 10px;text-align:center">
+        <div style="font-size:16px;font-weight:800;color:#2e7d32">≥ 70</div>
+        <div style="font-size:10px;color:#388e3c;font-weight:600">APPROVED</div>
+      </div>
+      <div style="flex:1;min-width:80px;background:#fff3e0;border:1px solid #ffcc80;border-radius:6px;padding:8px 10px;text-align:center">
+        <div style="font-size:16px;font-weight:800;color:#e65100">50–69</div>
+        <div style="font-size:10px;color:#e65100;font-weight:600">WAITLISTED</div>
+      </div>
+      <div style="flex:1;min-width:80px;background:#ffebee;border:1px solid #ef9a9a;border-radius:6px;padding:8px 10px;text-align:center">
+        <div style="font-size:16px;font-weight:800;color:#c62828">< 50</div>
+        <div style="font-size:10px;color:#c62828;font-weight:600">DECLINED</div>
+      </div>
+      <div style="flex:1;min-width:80px;background:#f4f7fb;border:1px solid #c5d5e8;border-radius:6px;padding:8px 10px;text-align:center">
+        <div style="font-size:16px;font-weight:800;color:#1a375e">${d.total_score}</div>
+        <div style="font-size:10px;color:#555;font-weight:600">THIS SCORE</div>
+      </div>
+    </div>`;
+
+  const hierarchyBar = `
+    <div style="margin-bottom:14px">
+      <div style="font-size:10px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">
+        Active Signal Hierarchy
+      </div>
+      <div style="display:flex;border-radius:6px;overflow:hidden;height:24px">
+        <div style="width:${qwPct}%;background:#2e75b6;display:flex;align-items:center;justify-content:center">
+          <span style="font-size:10px;font-weight:700;color:#fff">🔢 Quant ${qwPct}%</span>
+        </div>
+        <div style="width:${qlwPct}%;background:#007080;display:flex;align-items:center;justify-content:center">
+          <span style="font-size:10px;font-weight:700;color:#fff">📝 Qual ${qlwPct}%</span>
+        </div>
+      </div>
+      <div style="font-size:10px;color:#888;margin-top:4px">
+        Quantitative (verifiable) · Qualitative (unverifiable — capped at ${qlwPct}% of total)
+      </div>
+    </div>`;
+
+  const dimRows = dims.map(dim => {
+    const isQuant = dim.type === 'quant';
+    const bgColor = isQuant ? '#eef4fb' : '#eef8f8';
+    const tagColor = isQuant ? '#2e75b6' : '#007080';
+    const tagBg   = isQuant ? '#dbeafe' : '#ccf0f3';
+    const pct = Math.round((dim.score / dim.maxRaw) * 100);
+    const criteriaRows = dim.criteria.map(c =>
+      `<tr>
+        <td style="padding:3px 8px;font-size:10px;font-weight:600;color:#555;white-space:nowrap">${c.band}</td>
+        <td style="padding:3px 8px;font-size:10.5px;color:#444">${c.desc}</td>
+      </tr>`
+    ).join('');
+
+    return `
+      <div style="border:1px solid #dde4ef;border-radius:8px;overflow:hidden;margin-bottom:10px">
+        <div style="background:${bgColor};padding:8px 12px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:11px;font-weight:700;color:#1a375e;flex:1">${dim.name}</span>
+          <span style="background:${tagBg};color:${tagColor};font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px;text-transform:uppercase">${dim.icon} ${dim.type}</span>
+          <span style="font-size:13px;font-weight:800;color:#1a375e">${dim.score}<span style="font-size:10px;font-weight:400;color:#888">/25</span></span>
+        </div>
+        <div style="padding:6px 12px;background:#fff">
+          <div class="score-bar-track" style="margin-bottom:8px">
+            <div class="score-bar-fill" style="width:${pct}%;background:${tagColor}"></div>
+          </div>
+          <table style="width:100%;border-collapse:collapse">
+            <thead>
+              <tr style="background:#f4f7fb">
+                <th style="padding:3px 8px;font-size:9px;color:#888;text-align:left;font-weight:600;text-transform:uppercase">Band</th>
+                <th style="padding:3px 8px;font-size:9px;color:#888;text-align:left;font-weight:600;text-transform:uppercase">Criteria</th>
+              </tr>
+            </thead>
+            <tbody>${criteriaRows}</tbody>
+          </table>
+        </div>
+      </div>`;
+  }).join('');
+
+  return thresholds + hierarchyBar + dimRows;
 }
 
 function buildSignalTab(sig, reviewType) {

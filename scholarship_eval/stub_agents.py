@@ -47,11 +47,13 @@ class StubAnalysisAgent:
 
 
 class StubScoringAgent:
-    def __init__(self, high_threshold=0.78, low_threshold=0.50):
+    def __init__(self, high_threshold=0.78, low_threshold=0.50, quant_weight=0.50):
         self.high_threshold = high_threshold
         self.low_threshold  = low_threshold
+        self.quant_weight   = quant_weight
 
     def score(self, app: Application, evidence: Evidence) -> ScoringResult:
+        # ── Raw dimension scores (0–25 each) ──────────────────────────────────
         academic  = min(25.0, (app.gpa / 4.0) * 25.0)
         if   app.annual_household_income <= 30_000: financial = 25.0
         elif app.annual_household_income <= 50_000: financial = 20.0 + (50_000 - app.annual_household_income) / 20_000 * 5.0
@@ -62,7 +64,16 @@ class StubScoringAgent:
         essay       = min(25.0, (len(app.essay) / 700) * 20.0 + (3.0 if app.work_experience else 0.0))
 
         rubric = RubricScores(round(academic,1), round(financial,1), round(leadership,1), round(essay,1))
-        total  = rubric.total
+
+        # ── Apply signal hierarchy weighting ──────────────────────────────────
+        # Quantitative (verifiable): Academic + Financial
+        # Qualitative (unverifiable): Leadership + Essay
+        # Weighted total = quant_pair * quant_weight*2 + qual_pair * qual_weight*2
+        # This preserves 0–100 range while shifting weight toward verified data.
+        qw   = max(0.40, min(0.80, self.quant_weight))
+        qlw  = 1.0 - qw
+        total = ((academic + financial) * qw * 2.0 +
+                 (leadership + essay)   * qlw * 2.0)
 
         if   total >= 70: rec = DecisionOutcome.APPROVED
         elif total >= 50: rec = DecisionOutcome.WAITLISTED
@@ -96,7 +107,8 @@ class StubOrchestrator:
         if low_threshold  is not None: self.policy.confidence_low  = low_threshold
 
         self.analysis_agent    = StubAnalysisAgent()
-        self.scoring_agent     = StubScoringAgent(self.policy.confidence_high, self.policy.confidence_low)
+        self.scoring_agent     = StubScoringAgent(self.policy.confidence_high, self.policy.confidence_low,
+                                                   getattr(self.policy, 'quant_weight', 0.50))
         self.signal_evaluator  = SignalEvaluator()
         self.human_review      = HumanReviewLayer()
         self.verbose           = verbose

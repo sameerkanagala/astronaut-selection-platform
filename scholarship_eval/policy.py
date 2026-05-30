@@ -64,6 +64,13 @@ class ProgramPolicy:
     disagreement_sim_rate: float = 0.25  # probability a borderline case triggers human override
     reviewer_noise_sigma:  float = 2.5   # std-dev of score noise (higher=more variance/disagreement)
 
+    # ── Signal hierarchy ──────────────────────────────────────────────────────
+    # Prevents over-indexing on unverifiable qualitative signals.
+    # quant_weight applies to Academic + Financial (verifiable structured data).
+    # qual_weight (= 1 - quant_weight) applies to Leadership + Essay (unverifiable).
+    # Default 0.50 = balanced. Raise to 0.65-0.70 to reduce essay over-indexing.
+    quant_weight: float = 0.50
+
     # ── Fairness & governance ─────────────────────────────────────────────────
     fairness_monitoring: bool = True
     audit_all_decisions: bool = True
@@ -89,6 +96,7 @@ PRESETS: dict[str, ProgramPolicy] = {
         require_human_near_cutoff=False, min_reviewers_escalated=1,
         senior_adjudication_enabled=True, fairness_monitoring=True,
         reviewer_strictness=0.10, disagreement_sim_rate=0.15, reviewer_noise_sigma=2.0,
+        quant_weight=0.55,
     ),
 
     "high_dollar": ProgramPolicy(
@@ -107,6 +115,7 @@ PRESETS: dict[str, ProgramPolicy] = {
         require_human_near_cutoff=True, min_reviewers_escalated=2,
         senior_adjudication_enabled=True, fairness_monitoring=True,
         reviewer_strictness=0.45, disagreement_sim_rate=0.40, reviewer_noise_sigma=3.0,
+        quant_weight=0.65,
     ),
 
     "regulatory": ProgramPolicy(
@@ -125,6 +134,7 @@ PRESETS: dict[str, ProgramPolicy] = {
         require_human_near_cutoff=True, min_reviewers_escalated=2,
         senior_adjudication_enabled=True, fairness_monitoring=True,
         reviewer_strictness=0.70, disagreement_sim_rate=0.60, reviewer_noise_sigma=3.5,
+        quant_weight=0.70,
     ),
 
     "custom": ProgramPolicy(
@@ -158,6 +168,7 @@ def policy_from_dict(d: dict) -> ProgramPolicy:
         reviewer_strictness=float(d.get("reviewer_strictness", 0.20)),
         disagreement_sim_rate=float(d.get("disagreement_sim_rate", 0.25)),
         reviewer_noise_sigma=float(d.get("reviewer_noise_sigma", 2.5)),
+        quant_weight=float(d.get("quant_weight", 0.50)),
     )
 
 
@@ -184,4 +195,5 @@ def policy_to_dict(p: ProgramPolicy) -> dict:
         "reviewer_strictness":         p.reviewer_strictness,
         "disagreement_sim_rate":       p.disagreement_sim_rate,
         "reviewer_noise_sigma":        p.reviewer_noise_sigma,
+        "quant_weight":                p.quant_weight,
     }
