@@ -567,10 +567,10 @@
 
 <script>
 // ── State ─────────────────────────────────────────────────────────────────────
-let mode      = 'stub';
-let allApps   = [];
-let decisions = [];
-let presets   = {};
+let mode             = 'stub';
+let allApps          = [];
+let decisions        = [];
+let presets          = {};
 let awardSensitivity = 'low';
 
 // ── Init ──────────────────────────────────────────────────────────────────────
@@ -667,6 +667,8 @@ function toggleAll(cb) { document.querySelectorAll('.app-cb').forEach(c => c.che
 function getSelectedIds() { return [...document.querySelectorAll('.app-cb:checked')].map(c => c.value); }
 
 // ── Run ───────────────────────────────────────────────────────────────────────
+let _pollInterval = null;
+
 function runEvaluation() {
   const ids = getSelectedIds();
   if (!ids.length) { alert('Please select at least one applicant.'); return; }
@@ -676,6 +678,7 @@ function runEvaluation() {
 
   decisions = [];
   resetUI(ids.length);
+  if (_pollInterval) clearInterval(_pollInterval);
 
   const payload = {
     mode,
@@ -685,40 +688,42 @@ function runEvaluation() {
     policy:  getPolicy(),
   };
 
-  if (es) es.close();
+  setStatus('running', 'Starting…');
+  setRunBtn(true);
 
-  // Use fetch + ReadableStream for POST SSE
+  // POST to start job, then poll for results
   fetch('/api/evaluate', {
-    method: 'POST',
+    method:  'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  }).then(response => {
+    body:    JSON.stringify(payload),
+  })
+  .then(r => r.json())
+  .then(({ job_id, error }) => {
+    if (error) { setStatus('error', error); setRunBtn(false); return; }
     setStatus('running', 'Evaluating…');
-    setRunBtn(true);
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buf = '';
-
-    function read() {
-      reader.read().then(({ done, value }) => {
-        if (done) return;
-        buf += decoder.decode(value, { stream: true });
-        const parts = buf.split('\n\n');
-        buf = parts.pop();
-        parts.forEach(part => {
-          const line = part.trim();
-          if (line.startsWith('data:')) {
-            try { handleEvent(JSON.parse(line.slice(5).trim())); } catch {}
-          }
-        });
-        read();
-      });
-    }
-    read();
-  }).catch(err => {
+    // Poll every 800ms
+    _pollInterval = setInterval(() => pollJob(job_id), 800);
+  })
+  .catch(err => {
     setStatus('error', 'Connection error');
     setRunBtn(false);
   });
+}
+
+function pollJob(job_id) {
+  fetch(`/api/poll/${job_id}`)
+    .then(r => r.json())
+    .then(({ status, events, error }) => {
+      if (error) { setStatus('error', error); stopPolling(); return; }
+      (events || []).forEach(handleEvent);
+      if (status === 'done' || status === 'error') stopPolling();
+    })
+    .catch(() => stopPolling());
+}
+
+function stopPolling() {
+  if (_pollInterval) { clearInterval(_pollInterval); _pollInterval = null; }
+  setRunBtn(false);
 }
 
 function handleEvent(ev) {
