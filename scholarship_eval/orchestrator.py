@@ -89,7 +89,7 @@ class Orchestrator:
 
         if needs_human:
             self._log("  [5/5] Human Review …")
-            human_review  = self.human_review_layer.review(application, scoring, review_type)
+            human_review  = self.human_review_layer.review(application, scoring, review_type, self.policy)
             agreed        = human_review.outcome == scoring.ai_recommendation
             final_outcome = human_review.outcome
             audit.append(AuditStep(step="5_human_review",

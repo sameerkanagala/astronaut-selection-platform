@@ -57,6 +57,13 @@ class ProgramPolicy:
     min_reviewers_escalated:     int   = 1      # number of reviewers for escalated cases
     senior_adjudication_enabled: bool  = True   # allow senior adjudication tier
 
+    # ── Simulated disagreement controls ──────────────────────────────────────
+    # These control how likely human reviewers are to disagree with AI in
+    # the simulation, making preset differences visible in the results.
+    reviewer_strictness:   float = 0.20  # 0=very generous, 1=very strict (shifts approval bar)
+    disagreement_sim_rate: float = 0.25  # probability a borderline case triggers human override
+    reviewer_noise_sigma:  float = 2.5   # std-dev of score noise (higher=more variance/disagreement)
+
     # ── Fairness & governance ─────────────────────────────────────────────────
     fairness_monitoring: bool = True
     audit_all_decisions: bool = True
@@ -71,71 +78,53 @@ PRESETS: dict[str, ProgramPolicy] = {
         program_type="high_volume",
         description=(
             "Large applicant pool, moderate award value. Optimised for throughput. "
-            "AI automation is encouraged for clear-cut cases. Human review reserved "
-            "for ambiguous or borderline applications."
+            "AI automation encouraged for clear-cut cases. Human review reserved "
+            "for ambiguous applications. Generous approval bar."
         ),
-        confidence_high=0.78,
-        confidence_low=0.50,
-        cutoff_zone_pts=5.0,
-        award_sensitivity="low",
-        disagreement_tolerance=0.50,
-        evidence_mismatch_threshold=0.40,
-        rubric_variance_threshold=0.28,
-        auto_max_sensitivity=0.30,
-        escalation_threshold=0.60,
-        senior_escalation_threshold=0.80,
-        require_human_near_cutoff=False,
-        min_reviewers_escalated=1,
-        senior_adjudication_enabled=True,
-        fairness_monitoring=True,
+        confidence_high=0.78, confidence_low=0.50,
+        cutoff_zone_pts=5.0, award_sensitivity="low",
+        disagreement_tolerance=0.50, evidence_mismatch_threshold=0.40,
+        rubric_variance_threshold=0.28, auto_max_sensitivity=0.30,
+        escalation_threshold=0.60, senior_escalation_threshold=0.80,
+        require_human_near_cutoff=False, min_reviewers_escalated=1,
+        senior_adjudication_enabled=True, fairness_monitoring=True,
+        reviewer_strictness=0.10, disagreement_sim_rate=0.15, reviewer_noise_sigma=2.0,
     ),
 
     "high_dollar": ProgramPolicy(
         program_name="High-Dollar Grant Program",
         program_type="high_dollar",
         description=(
-            "High-value award ($25k+). Every incorrect decision carries significant "
-            "financial and reputational cost. Stricter thresholds, mandatory human "
-            "review near cutoffs, and multiple reviewers for escalated cases."
+            "High-value award ($25k+). Every error carries financial and reputational cost. "
+            "Stricter thresholds, mandatory human review near cutoffs, higher reviewer "
+            "disagreement rate, and elevated approval bar."
         ),
-        confidence_high=0.85,
-        confidence_low=0.60,
-        cutoff_zone_pts=8.0,
-        award_sensitivity="high",
-        disagreement_tolerance=0.35,
-        evidence_mismatch_threshold=0.30,
-        rubric_variance_threshold=0.22,
-        auto_max_sensitivity=0.15,
-        escalation_threshold=0.48,
-        senior_escalation_threshold=0.68,
-        require_human_near_cutoff=True,
-        min_reviewers_escalated=2,
-        senior_adjudication_enabled=True,
-        fairness_monitoring=True,
+        confidence_high=0.85, confidence_low=0.60,
+        cutoff_zone_pts=8.0, award_sensitivity="high",
+        disagreement_tolerance=0.35, evidence_mismatch_threshold=0.30,
+        rubric_variance_threshold=0.22, auto_max_sensitivity=0.15,
+        escalation_threshold=0.48, senior_escalation_threshold=0.68,
+        require_human_near_cutoff=True, min_reviewers_escalated=2,
+        senior_adjudication_enabled=True, fairness_monitoring=True,
+        reviewer_strictness=0.45, disagreement_sim_rate=0.40, reviewer_noise_sigma=3.0,
     ),
 
     "regulatory": ProgramPolicy(
         program_name="Regulatory / Compliance Program",
         program_type="regulatory",
         description=(
-            "Federal or regulated funding requiring documented human oversight, "
-            "full audit trails, and defensible decisions. Maximum scrutiny. "
-            "AI is advisory only for most cases."
+            "Federal or regulated funding. Maximum scrutiny, mandatory human oversight, "
+            "full audit trails. AI is advisory. Strict approval bar, high disagreement "
+            "simulation, senior adjudication for borderline cases."
         ),
-        confidence_high=0.90,
-        confidence_low=0.65,
-        cutoff_zone_pts=10.0,
-        award_sensitivity="high",
-        disagreement_tolerance=0.25,
-        evidence_mismatch_threshold=0.25,
-        rubric_variance_threshold=0.20,
-        auto_max_sensitivity=0.10,
-        escalation_threshold=0.42,
-        senior_escalation_threshold=0.62,
-        require_human_near_cutoff=True,
-        min_reviewers_escalated=2,
-        senior_adjudication_enabled=True,
-        fairness_monitoring=True,
+        confidence_high=0.90, confidence_low=0.65,
+        cutoff_zone_pts=10.0, award_sensitivity="high",
+        disagreement_tolerance=0.25, evidence_mismatch_threshold=0.25,
+        rubric_variance_threshold=0.20, auto_max_sensitivity=0.10,
+        escalation_threshold=0.42, senior_escalation_threshold=0.62,
+        require_human_near_cutoff=True, min_reviewers_escalated=2,
+        senior_adjudication_enabled=True, fairness_monitoring=True,
+        reviewer_strictness=0.70, disagreement_sim_rate=0.60, reviewer_noise_sigma=3.5,
     ),
 
     "custom": ProgramPolicy(
@@ -166,6 +155,9 @@ def policy_from_dict(d: dict) -> ProgramPolicy:
         min_reviewers_escalated=int(d.get("min_reviewers_escalated", 1)),
         senior_adjudication_enabled=bool(d.get("senior_adjudication_enabled", True)),
         fairness_monitoring=bool(d.get("fairness_monitoring", True)),
+        reviewer_strictness=float(d.get("reviewer_strictness", 0.20)),
+        disagreement_sim_rate=float(d.get("disagreement_sim_rate", 0.25)),
+        reviewer_noise_sigma=float(d.get("reviewer_noise_sigma", 2.5)),
     )
 
 
@@ -185,8 +177,11 @@ def policy_to_dict(p: ProgramPolicy) -> dict:
         "auto_max_sensitivity":       p.auto_max_sensitivity,
         "escalation_threshold":       p.escalation_threshold,
         "senior_escalation_threshold":p.senior_escalation_threshold,
-        "require_human_near_cutoff":  p.require_human_near_cutoff,
-        "min_reviewers_escalated":    p.min_reviewers_escalated,
-        "senior_adjudication_enabled":p.senior_adjudication_enabled,
-        "fairness_monitoring":        p.fairness_monitoring,
+        "require_human_near_cutoff":   p.require_human_near_cutoff,
+        "min_reviewers_escalated":     p.min_reviewers_escalated,
+        "senior_adjudication_enabled": p.senior_adjudication_enabled,
+        "fairness_monitoring":         p.fairness_monitoring,
+        "reviewer_strictness":         p.reviewer_strictness,
+        "disagreement_sim_rate":       p.disagreement_sim_rate,
+        "reviewer_noise_sigma":        p.reviewer_noise_sigma,
     }

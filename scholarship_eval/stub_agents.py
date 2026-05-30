@@ -143,7 +143,7 @@ class StubOrchestrator:
         )
 
         if needs_human:
-            human_review  = self.human_review.review(application, scoring, review_type)
+            human_review  = self.human_review.review(application, scoring, review_type, self.policy)
             agreed        = human_review.outcome == scoring.ai_recommendation
             final_outcome = human_review.outcome
             audit.append(AuditStep(step="5_human_review",
