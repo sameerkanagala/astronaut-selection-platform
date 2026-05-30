@@ -17,9 +17,18 @@ app = Flask(__name__)
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def sse(event_type: str, **data) -> str:
-    """Format a Server-Sent Event string."""
+    """
+    Format a Server-Sent Event string, padded to 4KB.
+    Padding forces Railway/nginx proxies to flush immediately
+    rather than buffering until the stream ends.
+    """
     payload = {"type": event_type, **data}
-    return f"data: {json.dumps(payload)}\n\n"
+    msg = f"data: {json.dumps(payload)}\n\n"
+    # Pad to 4096 bytes with SSE comment lines so proxies flush the buffer
+    if len(msg) < 4096:
+        pad = 4096 - len(msg)
+        msg = f": {' ' * pad}\n" + msg
+    return msg
 
 
 def decision_to_dict(decision) -> dict:
