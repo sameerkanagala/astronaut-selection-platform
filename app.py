@@ -111,18 +111,22 @@ def health():
 
 @app.route("/api/applications")
 def list_applications():
-    """Return the full list of available mock applicants."""
+    """Return the full list of available mock applicants including raw application text."""
     return jsonify([
         {
-            "id":       a.id,
-            "name":     a.name,
-            "gpa":      a.gpa,
-            "major":    a.major,
-            "year":     a.year,
-            "income":   a.annual_household_income,
-            "dependents": a.dependents,
-            "awards":   a.awards,
-            "activities": a.extracurriculars,
+            "id":             a.id,
+            "name":           a.name,
+            "age":            a.age,
+            "gpa":            a.gpa,
+            "major":          a.major,
+            "year":           a.year,
+            "income":         a.annual_household_income,
+            "dependents":     a.dependents,
+            "awards":         a.awards,
+            "activities":     a.extracurriculars,
+            "work_experience": a.work_experience,
+            "essay":          a.essay,
+            "recommendation": a.recommendation_summary,
         }
         for a in APPLICATIONS
     ])

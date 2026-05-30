@@ -198,9 +198,34 @@
     .audit-row td { padding: 0; }
     .audit-panel {
       background: #f8fafd; border-left: 3px solid var(--blue);
-      padding: 14px 18px; font-size: 12px; display: none;
+      padding: 0; font-size: 12px; display: none;
     }
     .audit-row.open .audit-panel { display: block; }
+    /* Tabs */
+    .tab-bar { display: flex; border-bottom: 1px solid var(--border);
+               background: #f0f4fa; }
+    .tab-btn { padding: 9px 18px; font-size: 12px; font-weight: 600;
+               color: #778; background: none; border: none; cursor: pointer;
+               border-bottom: 2px solid transparent; transition: all .15s; }
+    .tab-btn.active { color: var(--blue); border-bottom-color: var(--blue);
+                      background: #f8fafd; }
+    .tab-btn:hover:not(.active) { color: var(--navy); background: #e8eef7; }
+    .tab-pane { display: none; padding: 16px 18px; }
+    .tab-pane.active { display: block; }
+    /* Application view */
+    .app-field { margin-bottom: 14px; }
+    .app-field-label { font-size: 10px; font-weight: 700; text-transform: uppercase;
+                       letter-spacing: .07em; color: var(--blue); margin-bottom: 5px; }
+    .app-field-val { font-size: 12.5px; color: var(--grey); line-height: 1.6; }
+    .app-meta-grid { display: grid; grid-template-columns: repeat(3, 1fr);
+                     gap: 10px; margin-bottom: 14px; }
+    .app-meta-card { background: var(--white); border: 1px solid var(--border);
+                     border-radius: 7px; padding: 10px 12px; }
+    .app-meta-card .val { font-size: 18px; font-weight: 800; color: var(--navy); }
+    .app-meta-card .lbl { font-size: 10px; color: #999; margin-top: 2px; }
+    .tag-list { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tag { background: #e8f0fb; color: var(--blue); padding: 3px 10px;
+           border-radius: 12px; font-size: 11px; font-weight: 500; }
     .audit-step { display: flex; gap: 12px; padding: 7px 0;
                   border-bottom: 1px solid #e8eef7; }
     .audit-step:last-child { border-bottom: none; }
@@ -690,57 +715,115 @@ function toggleAudit(id) {
 }
 
 function buildAuditPanel(d) {
-  const steps = d.audit_trail.map((s, i) => `
-    <div class="audit-step">
-      <div class="audit-step-num">${i+1}</div>
-      <div class="audit-step-body">
-        <div class="audit-step-agent">${s.agent}</div>
-        <div class="audit-step-summary">${s.summary}</div>
-      </div>
-    </div>`).join('');
+  const appData = allApps.find(a => a.id === d.app_id) || {};
+  const uid = d.app_id.replace('-','');
 
+  // ── Tab: Application ──────────────────────────────────────────
+  const metaGrid = `
+    <div class="app-meta-grid">
+      <div class="app-meta-card"><div class="val">${appData.gpa ? appData.gpa.toFixed(2) : '—'}</div><div class="lbl">GPA</div></div>
+      <div class="app-meta-card"><div class="val">$${appData.income ? appData.income.toLocaleString() : '—'}</div><div class="lbl">Household Income</div></div>
+      <div class="app-meta-card"><div class="val">${appData.dependents ?? '—'}</div><div class="lbl">Dependents</div></div>
+    </div>`;
+
+  const basicInfo = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div class="app-field"><div class="app-field-label">Major</div><div class="app-field-val">${appData.major || '—'}</div></div>
+      <div class="app-field"><div class="app-field-label">Year</div><div class="app-field-val">${appData.year || '—'}</div></div>
+      <div class="app-field"><div class="app-field-label">Age</div><div class="app-field-val">${appData.age || '—'}</div></div>
+      <div class="app-field"><div class="app-field-label">Work Experience</div><div class="app-field-val">${appData.work_experience || 'None reported'}</div></div>
+    </div>`;
+
+  const awards = appData.awards && appData.awards.length
+    ? `<div class="app-field"><div class="app-field-label">Awards & Honours</div>
+       <div class="tag-list">${appData.awards.map(a => `<span class="tag">🏆 ${a}</span>`).join('')}</div></div>`
+    : '';
+
+  const activities = appData.activities && appData.activities.length
+    ? `<div class="app-field"><div class="app-field-label">Extracurriculars & Activities</div>
+       <div class="tag-list">${appData.activities.map(a => `<span class="tag">${a}</span>`).join('')}</div></div>`
+    : '';
+
+  const essay = appData.essay
+    ? `<div class="app-field"><div class="app-field-label">Personal Essay</div>
+       <div class="app-field-val" style="background:var(--white);border:1px solid var(--border);border-radius:7px;padding:12px 14px;line-height:1.7">${appData.essay}</div></div>`
+    : '';
+
+  const rec = appData.recommendation
+    ? `<div class="app-field"><div class="app-field-label">Recommendation Summary</div>
+       <div class="app-field-val" style="background:#fffdf0;border:1px solid #f0e8c0;border-radius:7px;padding:12px 14px;line-height:1.7;font-style:italic">${appData.recommendation}</div></div>`
+    : '';
+
+  const appTab = metaGrid + basicInfo + awards + activities + essay + rec;
+
+  // ── Tab: Scores & Evidence ────────────────────────────────────
   const scores = `
     <div class="score-bars">
       ${scoreBar('Academic Achievement', d.rubric.academic)}
       ${scoreBar('Financial Need',       d.rubric.financial)}
       ${scoreBar('Leadership & Service', d.rubric.leadership)}
       ${scoreBar('Essay Quality',        d.rubric.essay)}
-    </div>`;
+    </div>
+    <div style="margin-top:10px;font-size:11.5px;color:var(--grey);line-height:1.6">${d.reasoning}</div>`;
 
   const evidence = d.evidence ? `
-    <div class="audit-evidence-grid">
-      ${evItem('Academic', d.evidence.academic)}
-      ${evItem('Financial Need', d.evidence.financial)}
-      ${evItem('Leadership', d.evidence.leadership)}
-      ${evItem('Community Impact', d.evidence.community)}
-      ${evItem('Essay Quality', d.evidence.essay)}
-      ${evItem('Narrative', d.evidence.narrative)}
+    <div style="margin-top:14px">
+      <div style="font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;margin-bottom:8px">Extracted Evidence</div>
+      <div class="audit-evidence-grid">
+        ${evItem('Academic', d.evidence.academic)}
+        ${evItem('Financial Need', d.evidence.financial)}
+        ${evItem('Leadership', d.evidence.leadership)}
+        ${evItem('Community Impact', d.evidence.community)}
+        ${evItem('Essay Quality', d.evidence.essay)}
+        ${evItem('Narrative', d.evidence.narrative)}
+      </div>
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+        ${(d.evidence.strengths||[]).map(s=>`<span class="tag" style="background:#e8f5e9;color:var(--green)">✓ ${s}</span>`).join('')}
+        ${(d.evidence.concerns||[]).map(c=>`<span class="tag" style="background:#fff3e0;color:var(--orange)">⚠ ${c}</span>`).join('')}
+      </div>
     </div>` : '';
 
   const humanSection = d.human_review ? `
-    <div style="margin-top:10px;padding:10px;background:#fff;border:1px solid var(--border);border-radius:6px">
+    <div style="margin-top:14px;padding:12px 14px;background:#fff;border:1px solid var(--border);border-radius:7px">
       <div style="font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;margin-bottom:6px">
         Human Review — ${d.human_review.reviewer}
       </div>
-      <div style="font-size:12px;color:var(--grey)">${d.human_review.notes}</div>
-      ${d.human_review.override ? `<div style="margin-top:6px;font-size:12px;color:var(--orange)"><strong>Override:</strong> ${d.human_review.override}</div>` : ''}
+      <div style="font-size:12px;color:var(--grey);line-height:1.6">${d.human_review.notes}</div>
+      ${d.human_review.override ? `<div style="margin-top:8px;font-size:12px;color:var(--orange);line-height:1.5"><strong>Override reason:</strong> ${d.human_review.override}</div>` : ''}
     </div>` : '';
 
+  const scoresTab = scores + evidence + humanSection;
+
+  // ── Tab: Audit Trail ──────────────────────────────────────────
+  const steps = d.audit_trail.map((s, i) => `
+    <div class="audit-step">
+      <div class="audit-step-num">${i+1}</div>
+      <div class="audit-step-body">
+        <div class="audit-step-agent">${s.agent}</div>
+        <div class="audit-step-summary">${s.summary}</div>
+        <div style="font-size:10px;color:#aaa;margin-top:2px">${s.timestamp}</div>
+      </div>
+    </div>`).join('');
+
   return `<div class="audit-panel">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:12px">
-      <div>
-        <div style="font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;margin-bottom:6px">Rubric Scores</div>
-        ${scores}
-        <div style="margin-top:6px;font-size:11.5px;color:var(--grey)">${d.reasoning}</div>
-      </div>
-      <div>
-        <div style="font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;margin-bottom:6px">Audit Trail</div>
-        ${steps}
-      </div>
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('${uid}','app',this)">📋 Application</button>
+      <button class="tab-btn"        onclick="switchTab('${uid}','scores',this)">📊 Scores & Evidence</button>
+      <button class="tab-btn"        onclick="switchTab('${uid}','trail',this)">🔍 Audit Trail</button>
     </div>
-    ${evidence}
-    ${humanSection}
+    <div class="tab-pane active" id="tab-${uid}-app">${appTab}</div>
+    <div class="tab-pane"        id="tab-${uid}-scores">${scoresTab}</div>
+    <div class="tab-pane"        id="tab-${uid}-trail">${steps}</div>
   </div>`;
+}
+
+function switchTab(uid, name, btn) {
+  // Deactivate all tabs in this panel
+  const panel = btn.closest('.audit-panel');
+  panel.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  panel.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-' + uid + '-' + name).classList.add('active');
 }
 
 function scoreBar(label, val) {
