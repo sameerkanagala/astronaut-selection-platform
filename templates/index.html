@@ -270,6 +270,33 @@
                   font-size: 12px; }
     .cal-record:last-child { border-bottom: none; }
 
+    /* ── Routing tier badges ─────────────────────────────────── */
+    .badge-auto        { background:#e8f5e9; color:var(--green); }
+    .badge-parallel    { background:#e3f2fd; color:#1565c0; }
+    .badge-escalation  { background:#fff3e0; color:var(--orange); }
+    .badge-senior      { background:#fce4ec; color:var(--red); }
+
+    /* ── Signal panel ────────────────────────────────────────── */
+    .signal-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:10px 0; }
+    .signal-card { background:var(--white); border:1px solid var(--border); border-radius:7px;
+                   padding:10px 12px; text-align:center; }
+    .signal-card .sig-val { font-size:20px; font-weight:800; }
+    .signal-card .sig-lbl { font-size:10px; color:#999; margin-top:2px; }
+    .risk-low    { color:var(--green); }
+    .risk-medium { color:var(--orange); }
+    .risk-high   { color:var(--red); }
+    .flag-list { display:flex; flex-direction:column; gap:4px; margin-top:6px; }
+    .flag-item { display:flex; gap:6px; align-items:flex-start; font-size:11.5px;
+                 padding:5px 8px; border-radius:5px; line-height:1.4; }
+    .flag-item.sensitivity { background:#fff8e1; color:#b45309; }
+    .flag-item.disagreement { background:#fef2f2; color:#991b1b; }
+    .flag-item.ok { background:#f0fdf4; color:#166534; }
+
+    /* ── Section divider ─────────────────────────────────────── */
+    .policy-divider { font-size:10px; font-weight:700; text-transform:uppercase;
+                      letter-spacing:.07em; color:#5a85a8; padding:6px 0 4px;
+                      border-top:1px solid rgba(255,255,255,.1); margin-top:6px; }
+
     /* ── Utility ──────────────────────────────────────────────── */
     .hidden { display: none !important; }
     .spinner { display: inline-block; width: 14px; height: 14px;
@@ -326,6 +353,25 @@
         </select>
       </div>
 
+      <!-- Program Policy -->
+      <div class="policy-divider">Program Policy</div>
+
+      <div class="field">
+        <label>Program Preset</label>
+        <select id="preset-select" onchange="applyPreset(this.value)">
+          <option value="high_volume">High-Volume Merit Scholarship</option>
+          <option value="high_dollar">High-Dollar Grant Program</option>
+          <option value="regulatory">Regulatory / Compliance</option>
+          <option value="custom">Custom</option>
+        </select>
+      </div>
+
+      <div class="field" id="preset-desc-wrap">
+        <small style="font-size:10px;color:#6a9bbf;line-height:1.5;display:block" id="preset-desc">
+          Large applicant pool. AI automation encouraged for clear-cut cases.
+        </small>
+      </div>
+
       <!-- Confidence thresholds -->
       <div class="field">
         <label>High Confidence Threshold
@@ -333,12 +379,10 @@
         </label>
         <div class="slider-wrap">
           <input type="range" id="high-thresh" min="0.5" max="0.99" step="0.01" value="0.78"
-                 oninput="updateSlider('high')">
+                 oninput="updateSlider('high');markCustom()">
           <div class="slider-labels"><span>0.50</span><span>0.99</span></div>
         </div>
-        <small style="font-size:10px;color:#5a85a8;display:block;margin-top:3px">
-          Above this → AI-only decision
-        </small>
+        <small style="font-size:10px;color:#5a85a8;display:block;margin-top:2px">≥ this → auto decision</small>
       </div>
 
       <div class="field">
@@ -347,12 +391,81 @@
         </label>
         <div class="slider-wrap">
           <input type="range" id="low-thresh" min="0.1" max="0.79" step="0.01" value="0.50"
-                 oninput="updateSlider('low')">
+                 oninput="updateSlider('low');markCustom()">
           <div class="slider-labels"><span>0.10</span><span>0.79</span></div>
         </div>
-        <small style="font-size:10px;color:#5a85a8;display:block;margin-top:3px">
-          Below this → human-led decision
-        </small>
+        <small style="font-size:10px;color:#5a85a8;display:block;margin-top:2px">< this → escalation path</small>
+      </div>
+
+      <!-- Decision Sensitivity -->
+      <div class="field">
+        <label>Award Sensitivity</label>
+        <div class="toggle-row">
+          <button class="toggle-btn active" id="sens-low"    onclick="setAwardSens('low',this)">Low</button>
+          <button class="toggle-btn"        id="sens-medium" onclick="setAwardSens('medium',this)">Medium</button>
+          <button class="toggle-btn"        id="sens-high"   onclick="setAwardSens('high',this)">High</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Cutoff Zone <span class="slider-val" id="cutoff-val">5</span> pts
+        </label>
+        <div class="slider-wrap">
+          <input type="range" id="cutoff-zone" min="2" max="15" step="1" value="5"
+                 oninput="document.getElementById('cutoff-val').textContent=this.value;markCustom()">
+          <div class="slider-labels"><span>2</span><span>15</span></div>
+        </div>
+        <small style="font-size:10px;color:#5a85a8;display:block;margin-top:2px">Score within this of boundary → high sensitivity</small>
+      </div>
+
+      <!-- Disagreement -->
+      <div class="field">
+        <label>Disagreement Tolerance
+          <span class="slider-val" id="disagree-val">0.45</span>
+        </label>
+        <div class="slider-wrap">
+          <input type="range" id="disagree-thresh" min="0.15" max="0.80" step="0.05" value="0.45"
+                 oninput="document.getElementById('disagree-val').textContent=parseFloat(this.value).toFixed(2);markCustom()">
+          <div class="slider-labels"><span>0.15</span><span>0.80</span></div>
+        </div>
+        <small style="font-size:10px;color:#5a85a8;display:block;margin-top:2px">Above this → escalate</small>
+      </div>
+
+      <!-- Escalation thresholds -->
+      <div class="field">
+        <label>Escalation Threshold
+          <span class="slider-val" id="esc-val">0.55</span>
+        </label>
+        <div class="slider-wrap">
+          <input type="range" id="esc-thresh" min="0.30" max="0.85" step="0.05" value="0.55"
+                 oninput="document.getElementById('esc-val').textContent=parseFloat(this.value).toFixed(2);markCustom()">
+          <div class="slider-labels"><span>0.30</span><span>0.85</span></div>
+        </div>
+        <small style="font-size:10px;color:#5a85a8;display:block;margin-top:2px">Composite risk → Escalation</small>
+      </div>
+
+      <div class="field">
+        <label>Senior Adjudication Threshold
+          <span class="slider-val" id="senior-val">0.75</span>
+        </label>
+        <div class="slider-wrap">
+          <input type="range" id="senior-thresh" min="0.50" max="0.99" step="0.05" value="0.75"
+                 oninput="document.getElementById('senior-val').textContent=parseFloat(this.value).toFixed(2);markCustom()">
+          <div class="slider-labels"><span>0.50</span><span>0.99</span></div>
+        </div>
+        <small style="font-size:10px;color:#5a85a8;display:block;margin-top:2px">Composite risk → Senior Adjudication</small>
+      </div>
+
+      <!-- Oversight toggles -->
+      <div class="field">
+        <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer">
+          <span>Require human near cutoff</span>
+          <input type="checkbox" id="human-cutoff" onchange="markCustom()" style="width:auto;accent-color:var(--blue)">
+        </label>
+        <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;margin-top:6px">
+          <span>Senior adjudication enabled</span>
+          <input type="checkbox" id="senior-enabled" checked onchange="markCustom()" style="width:auto;accent-color:var(--blue)">
+        </label>
       </div>
 
       <!-- Applicants -->
@@ -423,8 +536,8 @@
             <thead>
               <tr>
                 <th>ID</th><th>Applicant</th><th>Score</th>
-                <th>Confidence</th><th>Review Type</th>
-                <th>AI Rec.</th><th>Final Decision</th><th>AI/Human</th>
+                <th>Confidence</th><th>Risk</th><th>Routing Tier</th>
+                <th>AI Rec.</th><th>Final Decision</th><th>Agreement</th>
               </tr>
             </thead>
             <tbody id="results-tbody"></tbody>
@@ -454,19 +567,16 @@
 
 <script>
 // ── State ─────────────────────────────────────────────────────────────────────
-let mode = 'stub';
-let allApps = [];
+let mode      = 'stub';
+let allApps   = [];
 let decisions = [];
-let es = null;
+let presets   = {};
+let awardSensitivity = 'low';
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  fetch('/api/applications')
-    .then(r => r.json())
-    .then(apps => {
-      allApps = apps;
-      renderAppList(apps);
-    });
+  fetch('/api/applications').then(r=>r.json()).then(apps => { allApps=apps; renderAppList(apps); });
+  fetch('/api/presets').then(r=>r.json()).then(p => { presets=p; });
 });
 
 function renderAppList(apps) {
@@ -489,33 +599,72 @@ function setMode(m) {
   document.getElementById('model-field').classList.toggle('hidden', m !== 'live');
 }
 
+function setAwardSens(val, btn) {
+  awardSensitivity = val;
+  document.querySelectorAll('#sens-low,#sens-medium,#sens-high').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  markCustom();
+}
+
+function applyPreset(key) {
+  if (!presets[key]) return;
+  const p = presets[key];
+  document.getElementById('high-thresh').value      = p.confidence_high;
+  document.getElementById('low-thresh').value       = p.confidence_low;
+  document.getElementById('cutoff-zone').value      = p.cutoff_zone_pts;
+  document.getElementById('disagree-thresh').value  = p.disagreement_tolerance;
+  document.getElementById('esc-thresh').value       = p.escalation_threshold;
+  document.getElementById('senior-thresh').value    = p.senior_escalation_threshold;
+  document.getElementById('human-cutoff').checked   = p.require_human_near_cutoff;
+  document.getElementById('senior-enabled').checked = p.senior_adjudication_enabled;
+  document.getElementById('high-val').textContent      = p.confidence_high.toFixed(2);
+  document.getElementById('low-val').textContent       = p.confidence_low.toFixed(2);
+  document.getElementById('cutoff-val').textContent    = p.cutoff_zone_pts;
+  document.getElementById('disagree-val').textContent  = p.disagreement_tolerance.toFixed(2);
+  document.getElementById('esc-val').textContent       = p.escalation_threshold.toFixed(2);
+  document.getElementById('senior-val').textContent    = p.senior_escalation_threshold.toFixed(2);
+  awardSensitivity = p.award_sensitivity;
+  ['low','medium','high'].forEach(s => {
+    document.getElementById('sens-'+s).classList.toggle('active', s === p.award_sensitivity);
+  });
+  document.getElementById('preset-desc').textContent = p.description || '';
+}
+
+function markCustom() {
+  document.getElementById('preset-select').value = 'custom';
+  document.getElementById('preset-desc').textContent = 'Manually configured — all parameters set by you.';
+}
+
+function getPolicy() {
+  return {
+    program_type:               document.getElementById('preset-select').value,
+    confidence_high:            parseFloat(document.getElementById('high-thresh').value),
+    confidence_low:             parseFloat(document.getElementById('low-thresh').value),
+    cutoff_zone_pts:            parseFloat(document.getElementById('cutoff-zone').value),
+    award_sensitivity:          awardSensitivity,
+    disagreement_tolerance:     parseFloat(document.getElementById('disagree-thresh').value),
+    escalation_threshold:       parseFloat(document.getElementById('esc-thresh').value),
+    senior_escalation_threshold:parseFloat(document.getElementById('senior-thresh').value),
+    require_human_near_cutoff:  document.getElementById('human-cutoff').checked,
+    senior_adjudication_enabled:document.getElementById('senior-enabled').checked,
+  };
+}
+
 function updateSlider(which) {
   const el  = document.getElementById(which + '-thresh');
   const val = parseFloat(el.value);
   document.getElementById(which + '-val').textContent = val.toFixed(2);
-  // Keep high > low
   if (which === 'high') {
     const low = document.getElementById('low-thresh');
-    if (val <= parseFloat(low.value)) {
-      low.value = (val - 0.01).toFixed(2);
-      document.getElementById('low-val').textContent = low.value;
-    }
+    if (val <= parseFloat(low.value)) { low.value=(val-0.01).toFixed(2); document.getElementById('low-val').textContent=low.value; }
   } else {
     const high = document.getElementById('high-thresh');
-    if (val >= parseFloat(high.value)) {
-      high.value = (val + 0.01).toFixed(2);
-      document.getElementById('high-val').textContent = high.value;
-    }
+    if (val >= parseFloat(high.value)) { high.value=(val+0.01).toFixed(2); document.getElementById('high-val').textContent=high.value; }
   }
 }
 
-function toggleAll(cb) {
-  document.querySelectorAll('.app-cb').forEach(c => c.checked = cb.checked);
-}
-
-function getSelectedIds() {
-  return [...document.querySelectorAll('.app-cb:checked')].map(c => c.value);
-}
+function toggleAll(cb) { document.querySelectorAll('.app-cb').forEach(c => c.checked = cb.checked); }
+function getSelectedIds() { return [...document.querySelectorAll('.app-cb:checked')].map(c => c.value); }
 
 // ── Run ───────────────────────────────────────────────────────────────────────
 function runEvaluation() {
@@ -530,11 +679,10 @@ function runEvaluation() {
 
   const payload = {
     mode,
-    api_key:        document.getElementById('api-key').value.trim(),
-    model:          document.getElementById('model-select').value,
-    app_ids:        ids,
-    high_threshold: parseFloat(document.getElementById('high-thresh').value),
-    low_threshold:  parseFloat(document.getElementById('low-thresh').value),
+    api_key: document.getElementById('api-key').value.trim(),
+    model:   document.getElementById('model-select').value,
+    app_ids: ids,
+    policy:  getPolicy(),
   };
 
   if (es) es.close();
@@ -676,12 +824,27 @@ function updateStats() {
       <div class="stat-val">${decisions.length}</div><div class="stat-lbl">Total</div></div>`;
 }
 
+function routingBadgeClass(rt) {
+  if (rt === 'Auto Decision')       return 'badge-auto';
+  if (rt === 'Parallel Review')     return 'badge-parallel';
+  if (rt === 'Escalation')          return 'badge-escalation';
+  if (rt === 'Senior Adjudication') return 'badge-senior';
+  return 'badge-parallel';
+}
+function riskClass(r) { return r < 0.35 ? 'risk-low' : r < 0.60 ? 'risk-medium' : 'risk-high'; }
+
 function addTableRow(d) {
-  const tbody = document.getElementById('results-tbody');
+  const tbody    = document.getElementById('results-tbody');
+  const sig      = d.signals || {};
+  const risk     = sig.composite_risk != null ? sig.composite_risk : '—';
+  const riskHtml = risk !== '—'
+    ? `<span class="${riskClass(risk)}" style="font-weight:700">${(risk*100).toFixed(0)}%</span>`
+    : '—';
+  const rtClass  = routingBadgeClass(d.review_type);
   const agreedHtml = d.agreed === null
     ? '<span style="color:#aaa">—</span>'
     : d.agreed
-      ? '<span style="color:var(--green)">✓ Agreed</span>'
+      ? '<span style="color:var(--green)">✓</span>'
       : '<span style="color:var(--orange)">✗ Override</span>';
 
   const rowId = 'row-' + d.app_id;
@@ -691,13 +854,14 @@ function addTableRow(d) {
       <td>${d.name}</td>
       <td><strong>${d.total_score}</strong>/100</td>
       <td><span class="pi-badge badge-${d.confidence_level}">${d.confidence_level} (${d.confidence})</span></td>
-      <td style="font-size:11px;color:#555">${d.review_type}</td>
+      <td>${riskHtml}</td>
+      <td><span class="pi-badge ${rtClass}" style="font-size:10px">${d.review_type}</span></td>
       <td><span class="pi-badge badge-${d.ai_recommendation}">${d.ai_recommendation}</span></td>
-      <td><span class="pi-badge badge-${d.final_outcome}" style="font-size:11px">${d.final_outcome.toUpperCase()}</span></td>
+      <td><span class="pi-badge badge-${d.final_outcome}">${d.final_outcome.toUpperCase()}</span></td>
       <td>${agreedHtml}</td>
     </tr>
     <tr class="audit-row" id="audit-${d.app_id}">
-      <td colspan="8">${buildAuditPanel(d)}</td>
+      <td colspan="9">${buildAuditPanel(d)}</td>
     </tr>`);
 }
 
@@ -805,16 +969,82 @@ function buildAuditPanel(d) {
       </div>
     </div>`).join('');
 
+  // ── Tab: Signals ──────────────────────────────────────────────
+  const sig = d.signals || {};
+  const sigTab = sig.composite_risk != null ? buildSignalTab(sig, d.review_type) :
+    '<p style="padding:16px;color:#aaa;font-size:12px">No signal data available.</p>';
+
   return `<div class="audit-panel">
     <div class="tab-bar">
       <button class="tab-btn active" onclick="switchTab('${uid}','app',this)">📋 Application</button>
       <button class="tab-btn"        onclick="switchTab('${uid}','scores',this)">📊 Scores & Evidence</button>
+      <button class="tab-btn"        onclick="switchTab('${uid}','signals',this)">⚡ Signals & Routing</button>
       <button class="tab-btn"        onclick="switchTab('${uid}','trail',this)">🔍 Audit Trail</button>
     </div>
     <div class="tab-pane active" id="tab-${uid}-app">${appTab}</div>
     <div class="tab-pane"        id="tab-${uid}-scores">${scoresTab}</div>
+    <div class="tab-pane"        id="tab-${uid}-signals">${sigTab}</div>
     <div class="tab-pane"        id="tab-${uid}-trail">${steps}</div>
   </div>`;
+}
+
+function buildSignalTab(sig, reviewType) {
+  const rc   = sig.composite_risk;
+  const sens = sig.sensitivity_score;
+  const dis  = sig.disagreement_score;
+
+  const meter = (val, label) => {
+    const pct = (val * 100).toFixed(0);
+    const col = val < 0.35 ? 'var(--green)' : val < 0.60 ? 'var(--orange)' : 'var(--red)';
+    return `<div class="score-bar-row">
+      <span class="score-bar-label">${label}</span>
+      <div class="score-bar-track"><div class="score-bar-fill" style="width:${pct}%;background:${col}"></div></div>
+      <span class="score-bar-val" style="color:${col}">${pct}%</span>
+    </div>`;
+  };
+
+  const rtClass = routingBadgeClass(reviewType);
+  const cutoffBadge = sig.near_cutoff
+    ? `<span class="pi-badge" style="background:#fef9c3;color:#92400e">⚠ Near Cutoff (${sig.cutoff_distance} pts)</span>`
+    : `<span class="pi-badge" style="background:#f0fdf4;color:#166534">✓ Clear of Boundary (${sig.cutoff_distance} pts)</span>`;
+
+  const sensFlagsHtml = (sig.sensitivity_flags||[]).length
+    ? sig.sensitivity_flags.map(f=>`<div class="flag-item sensitivity">⚡ ${f}</div>`).join('')
+    : '<div class="flag-item ok">✓ No sensitivity flags</div>';
+
+  const disFlagsHtml = (sig.disagreement_flags||[]).length
+    ? sig.disagreement_flags.map(f=>`<div class="flag-item disagreement">⚠ ${f}</div>`).join('')
+    : '<div class="flag-item ok">✓ No disagreement signals detected</div>';
+
+  return `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;margin-bottom:10px">Composite Signal Scores</div>
+        <div class="score-bars">
+          ${meter(rc,   'Composite Risk')}
+          ${meter(sens, 'Decision Sensitivity')}
+          ${meter(dis,  'Disagreement')}
+        </div>
+        <div style="margin-top:12px">
+          <div style="font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;margin-bottom:6px">Routing Decision</div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span class="pi-badge ${rtClass}" style="font-size:11px">${reviewType}</span>
+            ${cutoffBadge}
+          </div>
+          <div style="font-size:11px;color:#666;margin-top:8px;line-height:1.5">${sig.routing_rationale||''}</div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;margin-bottom:6px">Sensitivity Flags</div>
+        <div class="flag-list">${sensFlagsHtml}</div>
+        <div style="font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;margin:12px 0 6px">Disagreement Signals</div>
+        <div class="flag-list">${disFlagsHtml}</div>
+        <div style="margin-top:10px;font-size:11px;color:#888">
+          Rubric variance: <strong>σ=${sig.rubric_variance||'—'}</strong> &nbsp;|&nbsp;
+          Evidence-score mismatch: <strong>${sig.evidence_score_mismatch ? '⚠ Yes' : '✓ No'}</strong>
+        </div>
+      </div>
+    </div>`;
 }
 
 function switchTab(uid, name, btn) {

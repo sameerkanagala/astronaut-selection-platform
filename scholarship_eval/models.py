@@ -12,21 +12,26 @@ import datetime
 # ─────────────────────────────────────────────
 
 class ConfidenceLevel(Enum):
-    HIGH = "high"       # > 0.78  → AI-only decision
-    MEDIUM = "medium"   # 0.50–0.78 → parallel AI + human review
-    LOW = "low"         # < 0.50  → human-led decision
+    HIGH   = "high"
+    MEDIUM = "medium"
+    LOW    = "low"
 
 
 class DecisionOutcome(Enum):
-    APPROVED = "approved"
+    APPROVED   = "approved"
     WAITLISTED = "waitlisted"
-    DECLINED = "declined"
+    DECLINED   = "declined"
 
 
 class ReviewType(Enum):
-    AI_ONLY = "AI-Only"
-    PARALLEL = "Parallel AI + Human"
-    HUMAN_LED = "Human-Led"
+    AUTO_DECISION       = "Auto Decision"
+    PARALLEL_REVIEW     = "Parallel Review"
+    ESCALATION          = "Escalation"
+    SENIOR_ADJUDICATION = "Senior Adjudication"
+    # Legacy aliases kept for backward compatibility
+    AI_ONLY   = "Auto Decision"
+    PARALLEL  = "Parallel Review"
+    HUMAN_LED = "Escalation"
 
 
 # ─────────────────────────────────────────────
@@ -165,15 +170,16 @@ class AuditStep:
 class Decision:
     """The complete, final decision record for one application."""
     application_id: str
-    applicant_name: str
-    review_type: ReviewType
-    evidence: Evidence
-    scoring: ScoringResult
-    human_review: Optional[HumanReview]
-    final_outcome: DecisionOutcome
-    agreed: Optional[bool]             # None when AI-only
-    audit_trail: List[AuditStep]
-    decided_at: str = field(
+    applicant_name:  str
+    review_type:     ReviewType
+    evidence:        Evidence
+    scoring:         ScoringResult
+    human_review:    Optional[HumanReview]
+    final_outcome:   DecisionOutcome
+    agreed:          Optional[bool]       # None when AI-only
+    audit_trail:     List[AuditStep]
+    signals:         Optional[Any] = None # SignalEvaluation (imported lazily to avoid circular)
+    decided_at:      str = field(
         default_factory=lambda: datetime.datetime.utcnow().isoformat()
     )
 

@@ -8,7 +8,8 @@ import traceback
 from flask import Flask, render_template, request, Response, stream_with_context, jsonify
 
 from scholarship_eval.mock_data import APPLICATIONS
-from scholarship_eval.models import DecisionOutcome, ReviewType
+from scholarship_eval.models   import DecisionOutcome, ReviewType
+from scholarship_eval.policy   import PRESETS, policy_from_dict, policy_to_dict
 
 app = Flask(__name__)
 
@@ -59,12 +60,24 @@ def decision_to_dict(decision) -> dict:
             "notes":       hr.notes,
             "override":    hr.override_reason,
         } if hr else None,
+        "signals": {
+            "composite_risk":      decision.signals.composite_risk,
+            "sensitivity_score":   decision.signals.sensitivity_score,
+            "disagreement_score":  decision.signals.disagreement_score,
+            "near_cutoff":         decision.signals.near_cutoff,
+            "cutoff_distance":     decision.signals.cutoff_distance,
+            "rubric_variance":     decision.signals.rubric_variance,
+            "sensitivity_flags":   decision.signals.sensitivity_flags,
+            "disagreement_flags":  decision.signals.disagreement_flags,
+            "routing_rationale":   decision.signals.routing_rationale,
+        } if decision.signals else None,
         "audit_trail": [
             {
                 "step":      s.step,
                 "agent":     s.agent,
                 "summary":   s.summary,
                 "timestamp": s.timestamp,
+                "metadata":  s.metadata,
             }
             for s in decision.audit_trail
         ],
@@ -132,6 +145,12 @@ def list_applications():
     ])
 
 
+@app.route("/api/presets")
+def get_presets():
+    """Return all program policy presets."""
+    return jsonify({k: policy_to_dict(v) for k, v in PRESETS.items()})
+
+
 @app.route("/api/evaluate", methods=["POST"])
 def evaluate():
     """
@@ -139,21 +158,30 @@ def evaluate():
 
     Expected JSON body:
     {
-        "mode":           "stub" | "live",
-        "api_key":        "sk-ant-...",   // live mode only
-        "model":          "claude-haiku-4-5-20251001",
-        "app_ids":        ["APP-001", ...],
-        "high_threshold": 0.78,
-        "low_threshold":  0.50
+        "mode":    "stub" | "live",
+        "api_key": "sk-ant-...",
+        "model":   "claude-haiku-4-5-20251001",
+        "app_ids": ["APP-001", ...],
+        "policy":  { ...ProgramPolicy fields... }   // optional, defaults to high_volume preset
     }
     """
-    body           = request.json or {}
-    mode           = body.get("mode", "stub")
-    api_key        = body.get("api_key", "").strip()
-    model          = body.get("model", "claude-haiku-4-5-20251001")
-    app_ids        = body.get("app_ids", [a.id for a in APPLICATIONS])
-    high_threshold = float(body.get("high_threshold", 0.78))
-    low_threshold  = float(body.get("low_threshold",  0.50))
+    body    = request.json or {}
+    mode    = body.get("mode", "stub")
+    api_key = body.get("api_key", "").strip()
+    model   = body.get("model", "claude-haiku-4-5-20251001")
+    app_ids = body.get("app_ids", [a.id for a in APPLICATIONS])
+
+    # Build policy from request or use preset
+    policy_data = body.get("policy", {})
+    preset_key  = policy_data.get("program_type", "high_volume")
+    if preset_key in PRESETS and not policy_data.get("_custom"):
+        policy = PRESETS.get(preset_key, PRESETS["high_volume"])
+        # Allow individual field overrides on top of preset
+        for k, v in policy_data.items():
+            if hasattr(policy, k) and k not in ("program_name", "program_type", "description"):
+                setattr(policy, k, type(getattr(policy, k))(v))
+    else:
+        policy = policy_from_dict(policy_data)
 
     # Select applications
     app_map     = {a.id: a for a in APPLICATIONS}
@@ -171,21 +199,12 @@ def evaluate():
                     return
                 from anthropic import Anthropic
                 from scholarship_eval.orchestrator import Orchestrator
-                client      = Anthropic(api_key=api_key)
-                orchestrator = Orchestrator(
-                    client=client,
-                    model=model,
-                    verbose=False,
-                    high_threshold=high_threshold,
-                    low_threshold=low_threshold,
-                )
+                client       = Anthropic(api_key=api_key)
+                orchestrator = Orchestrator(client=client, model=model,
+                                            policy=policy, verbose=False)
             else:
                 from scholarship_eval.stub_agents import StubOrchestrator
-                orchestrator = StubOrchestrator(
-                    verbose=False,
-                    high_threshold=high_threshold,
-                    low_threshold=low_threshold,
-                )
+                orchestrator = StubOrchestrator(verbose=False, policy=policy)
 
             yield sse("start", total=len(selected))
 
