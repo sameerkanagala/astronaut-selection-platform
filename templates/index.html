@@ -431,32 +431,7 @@
         <small style="font-size:10px;color:#5a85a8;display:block;margin-top:2px">Above this → escalate</small>
       </div>
 
-      <!-- Escalation thresholds -->
-      <div class="field">
-        <label>Escalation Threshold
-          <span class="slider-val" id="esc-val">0.55</span>
-        </label>
-        <div class="slider-wrap">
-          <input type="range" id="esc-thresh" min="0.30" max="0.85" step="0.05" value="0.55"
-                 oninput="document.getElementById('esc-val').textContent=parseFloat(this.value).toFixed(2);markCustom()">
-          <div class="slider-labels"><span>0.30</span><span>0.85</span></div>
-        </div>
-        <small style="font-size:10px;color:#5a85a8;display:block;margin-top:2px">Composite risk → Escalation</small>
-      </div>
-
-      <div class="field">
-        <label>Senior Adjudication Threshold
-          <span class="slider-val" id="senior-val">0.75</span>
-        </label>
-        <div class="slider-wrap">
-          <input type="range" id="senior-thresh" min="0.50" max="0.99" step="0.05" value="0.75"
-                 oninput="document.getElementById('senior-val').textContent=parseFloat(this.value).toFixed(2);markCustom()">
-          <div class="slider-labels"><span>0.50</span><span>0.99</span></div>
-        </div>
-        <small style="font-size:10px;color:#5a85a8;display:block;margin-top:2px">Composite risk → Senior Adjudication</small>
-      </div>
-
-      <!-- Disagreement simulation -->
+      <!-- Disagreement simulation — grouped with tolerance -->
       <div class="policy-divider">Disagreement Simulation</div>
 
       <div class="field">
@@ -494,7 +469,36 @@
         <small style="font-size:10px;color:#5a85a8;display:block;margin-top:2px">Higher = more score variance between reviewers</small>
       </div>
 
+      <!-- Escalation thresholds -->
+      <div class="policy-divider">Escalation Thresholds</div>
+
+      <div class="field">
+        <label>Escalation Threshold
+          <span class="slider-val" id="esc-val">0.55</span>
+        </label>
+        <div class="slider-wrap">
+          <input type="range" id="esc-thresh" min="0.30" max="0.85" step="0.05" value="0.55"
+                 oninput="document.getElementById('esc-val').textContent=parseFloat(this.value).toFixed(2);markCustom()">
+          <div class="slider-labels"><span>0.30</span><span>0.85</span></div>
+        </div>
+        <small style="font-size:10px;color:#5a85a8;display:block;margin-top:2px">Composite risk → Escalation</small>
+      </div>
+
+      <div class="field">
+        <label>Senior Adjudication Threshold
+          <span class="slider-val" id="senior-val">0.75</span>
+        </label>
+        <div class="slider-wrap">
+          <input type="range" id="senior-thresh" min="0.50" max="0.99" step="0.05" value="0.75"
+                 oninput="document.getElementById('senior-val').textContent=parseFloat(this.value).toFixed(2);markCustom()">
+          <div class="slider-labels"><span>0.50</span><span>0.99</span></div>
+        </div>
+        <small style="font-size:10px;color:#5a85a8;display:block;margin-top:2px">Composite risk → Senior Adjudication</small>
+      </div>
+
       <!-- Oversight toggles -->
+      <div class="policy-divider">Oversight</div>
+
       <div class="field">
         <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer">
           <span>Require human near cutoff</span>
