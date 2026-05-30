@@ -1,335 +1,343 @@
 """
-Simulated scholarship applications — 10 diverse candidates spanning
-all confidence tiers (high / medium / low) and all outcomes.
+Simulated scholarship applications — 10 high school seniors (or equivalent)
+applying for college. Profiles span all confidence tiers and all three outcomes.
 """
 from .models import Application
 
 APPLICATIONS: list[Application] = [
 
-    # ── 1. Strong candidate — expected HIGH confidence APPROVED ──────────────
+    # ── 1. Strong candidate — HIGH confidence APPROVED ───────────────────────
     Application(
         id="APP-001",
         name="Sofia Marchetti",
-        age=20,
+        age=18,
         gpa=3.95,
-        major="Biomedical Engineering",
-        year="Junior",
+        major="Intended: Biomedical Engineering",
+        year="High School Senior",
         annual_household_income=34_000,
         dependents=3,
         essay=(
             "Growing up as the eldest of four children in a single-parent household, "
-            "I learned early that resources are finite but determination is not. My mother "
-            "worked two jobs while I managed evening homework sessions for my siblings. "
-            "This experience shaped my commitment to biomedical engineering — I want to "
-            "design low-cost diagnostic devices for underserved communities. Last summer "
-            "I interned at a nonprofit hospital where I prototyped a $12 pulse oximeter "
-            "that is now in clinical trials in rural Guatemala. I plan to use this "
-            "scholarship to fund my senior capstone, which extends that project to "
-            "neonatal monitoring. My goal is to prove that life-saving technology need not "
-            "be a luxury."
+            "I learned early that resources are finite but determination is not. While my "
+            "mother worked two jobs, I managed evening homework sessions for my younger "
+            "siblings and maintained a 3.95 GPA throughout high school. Last summer I "
+            "volunteered at a free clinic where I shadowed a physician and helped patients "
+            "navigate appointment scheduling. That experience crystallised my goal: to study "
+            "biomedical engineering and design low-cost diagnostic devices for underserved "
+            "communities. Without this scholarship, I will need to defer enrollment to work "
+            "full-time for a year. With it, I can begin the path toward that mission "
+            "immediately. I do not take that opportunity for granted."
         ),
         extracurriculars=[
-            "Society of Women Engineers (chapter president)",
-            "Volunteer EMT — 200+ hours",
-            "STEM tutoring program founder",
+            "STEM Club (founder and president)",
+            "Volunteer, Community Free Clinic — 180 hours",
+            "Peer tutoring programme — 3 years",
         ],
-        work_experience="Research assistant, Biomedical Devices Lab (2 years)",
+        work_experience="Part-time cashier, 15 hrs/week throughout junior and senior year",
         recommendation_summary=(
-            "Dr. Reyes describes Sofia as 'the most motivated student I have supervised "
-            "in 20 years.' She consistently exceeds expectations, leads peers, and "
-            "demonstrates rare engineering intuition. Unreserved recommendation."
+            "Mr. Torres, AP Biology teacher, describes Sofia as 'the most driven student "
+            "I have taught in 22 years.' He highlights her ability to explain complex concepts "
+            "to peers and her genuine commitment to community health. Unreserved recommendation."
         ),
-        awards=["National Merit Scholar", "Dean's List (5 semesters)", "NSF REU Award"],
+        awards=["Valedictorian", "National Merit Commended Scholar", "State Science Fair — 2nd Place"],
     ),
 
-    # ── 2. Borderline case — expected MEDIUM confidence WAITLISTED ────────────
+    # ── 2. Borderline — MEDIUM confidence WAITLISTED ─────────────────────────
     Application(
         id="APP-002",
         name="Marcus Thompson",
-        age=22,
+        age=18,
         gpa=3.20,
-        major="Political Science",
-        year="Senior",
+        major="Intended: Political Science / Pre-Law",
+        year="High School Senior",
         annual_household_income=52_000,
         dependents=1,
         essay=(
-            "I transferred from community college after two years of full-time work to "
-            "support my family following my father's illness. My GPA does not fully "
-            "reflect my capability — my first semester back I earned a 3.8 while managing "
-            "20 hours per week of caregiving. I am passionate about criminal justice reform "
-            "and have spent three years volunteering with a reentry program for formerly "
-            "incarcerated youth. After graduation I plan to attend law school. This "
-            "scholarship would allow me to reduce my work hours and focus on my thesis, "
-            "which examines disparities in juvenile sentencing."
+            "My junior year was supposed to be my strongest. Instead, I spent four months "
+            "driving my father to chemotherapy appointments three times a week. My GPA dropped "
+            "from a 3.6 to a 2.9 that year — a dip my transcript does not fully explain. "
+            "This year I rebuilt my average to 3.5 in the second semester and was accepted "
+            "to two universities. I want to study political science and eventually become a "
+            "public defender. I have spent two summers volunteering with a reentry programme "
+            "for formerly incarcerated youth and know firsthand how much legal representation "
+            "matters. This scholarship would allow me to focus on my studies rather than "
+            "working 30 hours a week to contribute to household expenses."
         ),
         extracurriculars=[
-            "Prison reentry volunteer program",
-            "Mock trial team",
-            "First-generation student mentor",
+            "Mock Trial team (captain, senior year)",
+            "Reentry programme volunteer — 2 summers",
+            "First-generation college student mentor",
         ],
-        work_experience="Paralegal intern, Public Defender's Office (1 year)",
+        work_experience="Grocery store stock associate, 30 hrs/week (junior and senior year)",
         recommendation_summary=(
-            "Professor Walsh notes Marcus's exceptional analytical writing and genuine "
-            "commitment to social justice, but acknowledges inconsistent early grades. "
-            "Strong recommendation with context provided."
+            "Ms. Walsh, AP Government teacher, notes Marcus's exceptional analytical writing "
+            "and the context behind his junior-year grades. She acknowledges the dip but calls "
+            "his recovery 'remarkable under the circumstances.' Strong recommendation."
         ),
-        awards=["Transfer Student Achievement Award"],
+        awards=["Regional Mock Trial — Outstanding Advocate"],
     ),
 
-    # ── 3. Weak candidate — expected HIGH confidence DECLINED ────────────────
+    # ── 3. Weak candidate — HIGH confidence DECLINED ─────────────────────────
     Application(
         id="APP-003",
         name="Tyler Brooks",
-        age=19,
+        age=18,
         gpa=2.45,
         major="Undecided",
-        year="Freshman",
+        year="High School Senior",
         annual_household_income=120_000,
         dependents=0,
         essay=(
-            "I want this scholarship because college is expensive and I could use the "
-            "money. I enjoy playing video games and hanging out with friends. I haven't "
-            "decided on a major yet but I'm thinking maybe business or something. "
-            "My grades weren't great in high school but I'm hoping they will improve. "
-            "I think I deserve this scholarship because everyone deserves a chance."
+            "I want to go to college because I think it will help me get a good job. "
+            "I am not sure what I want to study yet but I am thinking maybe business "
+            "or something related to sports. My grades were not great but I have been "
+            "improving. I enjoy hanging out with my friends and playing video games. "
+            "I think I deserve this scholarship because college is expensive and everyone "
+            "deserves a chance to succeed."
         ),
         extracurriculars=[],
         work_experience=None,
         recommendation_summary=(
-            "Guidance counselor provides a generic letter noting Tyler is 'a pleasant "
-            "student who attends class regularly.' No specific achievements cited."
+            "School counselor provides a brief form letter noting Tyler 'attends class "
+            "regularly and is polite.' No specific academic strengths or achievements cited."
         ),
         awards=[],
     ),
 
-    # ── 4. Ambiguous — expected LOW confidence, human-led ────────────────────
+    # ── 4. Ambiguous gap year — LOW confidence, human-led ────────────────────
     Application(
         id="APP-004",
         name="Aisha Okonkwo",
-        age=23,
+        age=19,
         gpa=3.55,
-        major="Public Health",
-        year="Senior",
+        major="Intended: Public Health",
+        year="High School Graduate (gap year)",
         annual_household_income=41_000,
         dependents=2,
         essay=(
-            "My application is unconventional. I took a two-year leave of absence to care "
-            "for my mother through cancer treatment. During that time I became a certified "
-            "community health worker and organized a neighborhood vaccination drive that "
-            "reached 400 residents. I returned to university last year with renewed purpose. "
-            "My academic record reflects a tale of two periods — a 2.9 before my leave and "
-            "a 3.9 since returning. I believe my lived experience strengthens my capacity "
-            "to serve communities. However, I understand reviewers may weigh my full GPA "
-            "differently. I am asking for this scholarship to complete my MPH applications "
-            "and attend a global health conference where I have an accepted abstract."
+            "I graduated high school last spring with a 3.6 GPA and deferred enrollment "
+            "to care for my mother during cancer treatment. During that year I became a "
+            "certified community health worker and organised a neighbourhood vaccination "
+            "drive that reached over 400 residents. I now hold an acceptance at State "
+            "University and am applying for this scholarship to make attendance financially "
+            "possible. My gap year was not planned, but it deepened my commitment to public "
+            "health more than any classroom could have. I understand my profile is "
+            "unconventional and I welcome the committee's careful review."
         ),
         extracurriculars=[
-            "Community Health Worker (certified)",
-            "Vaccination outreach organizer",
-            "University Global Health Club",
+            "Community Health Worker (certified during gap year)",
+            "Vaccination outreach organiser — 400+ residents reached",
+            "High school: Science National Honour Society",
         ],
-        work_experience="Community health navigator, county health department (part-time)",
+        work_experience="Community health navigator, county health department (part-time, gap year)",
         recommendation_summary=(
-            "Dr. Patel notes a dramatic academic turnaround and exceptional community "
-            "health work, but flags the two-year gap and split GPA as factors requiring "
-            "holistic review. Recommends with caveats."
+            "Dr. Patel, county health department supervisor, calls Aisha 'one of the most "
+            "capable community health workers I have supervised, regardless of age.' Notes "
+            "the gap year was family-driven and recommends strongly."
         ),
-        awards=["Community Impact Award — City Health Department"],
+        awards=["Community Impact Award — City Health Department (gap year)"],
     ),
 
-    # ── 5. Strong STEM candidate — expected HIGH confidence APPROVED ──────────
+    # ── 5. Strong STEM — HIGH confidence APPROVED ────────────────────────────
     Application(
         id="APP-005",
         name="Priya Nair",
-        age=21,
+        age=17,
         gpa=3.88,
-        major="Computer Science",
-        year="Junior",
+        major="Intended: Computer Science",
+        year="High School Senior",
         annual_household_income=29_000,
         dependents=4,
         essay=(
-            "My parents immigrated from Kerala with $800 and a belief in education. "
-            "I am the first in my family to attend a four-year university. I study "
-            "computer science because I want to build tools that help people like my "
-            "parents navigate bureaucratic systems — tax filing, visa renewals, benefits "
-            "enrollment. I have already built a free multilingual benefits calculator "
-            "used by 1,200 households in our city. I lead a coding club that has taught "
-            "Python to 60 high-school students from low-income backgrounds. This "
-            "scholarship will fund my open-source project full time over the summer."
+            "My parents immigrated from Kerala with very little, believing education was "
+            "the path forward. I am the first in my family to apply to a four-year university. "
+            "In tenth grade I taught myself Python using free online resources and built a "
+            "multilingual benefits calculator that 600 households in my city now use to find "
+            "food assistance and housing support. Last year I started a coding club at my "
+            "high school that has introduced 45 students to programming. I have been accepted "
+            "to a computer science programme and want to spend my career building civic "
+            "technology for immigrant and low-income communities. This scholarship is the "
+            "difference between attending and deferring."
         ),
         extracurriculars=[
-            "Coding club founder and lead instructor",
-            "Hackathon organizer (3 events)",
-            "University AI Ethics reading group",
+            "Coding club founder and instructor",
+            "Hackathon participant — 2 regional events",
+            "School newspaper (technology editor)",
         ],
-        work_experience="Software engineering intern, civic tech nonprofit (2 summers)",
+        work_experience="Informal tech support for neighbours and babysitting, ongoing",
         recommendation_summary=(
-            "Professor Chen calls Priya 'a natural systems thinker with rare social "
-            "conscience.' The benefits calculator project is cited as graduate-level work "
-            "done as a sophomore. Highest recommendation."
+            "Ms. Chen, AP Computer Science teacher, calls Priya 'the most self-directed "
+            "learner I have encountered in a high school classroom.' The benefits calculator "
+            "is cited as work typically done by university students. Highest recommendation."
         ),
-        awards=["Congressional App Challenge — Regional Winner", "Dean's List (4 semesters)"],
+        awards=["Congressional App Challenge — Regional Finalist", "AP Scholar with Distinction"],
     ),
 
-    # ── 6. Moderate candidate — expected MEDIUM confidence APPROVED ──────────
+    # ── 6. Moderate candidate — MEDIUM confidence APPROVED ───────────────────
     Application(
         id="APP-006",
         name="James Kowalski",
-        age=21,
+        age=18,
         gpa=3.40,
-        major="Environmental Science",
-        year="Junior",
+        major="Intended: Environmental Science",
+        year="High School Senior",
         annual_household_income=47_000,
         dependents=1,
         essay=(
-            "I grew up near a Superfund site and watched my neighborhood deal with "
-            "elevated lead levels for years. That experience made environmental science "
-            "personal for me. I am conducting independent research on soil remediation "
-            "using biochar, and I presented preliminary findings at a regional conference "
-            "last spring. My GPA reflects a rough first year adjusting to university life, "
-            "but I have maintained a 3.7 over the past four semesters. I hope to pursue "
-            "a PhD and focus on environmental justice in industrial corridors."
+            "I grew up two miles from a Superfund site. When I was twelve, our neighbourhood "
+            "received notices about elevated lead levels in the soil. That letter is why I "
+            "want to study environmental science. My freshman grades were poor — I was dealing "
+            "with a family move and changing schools mid-year. Since sophomore year I have "
+            "maintained a 3.7 average and independently designed a biochar experiment for our "
+            "school's science fair that earned a regional award. I have been accepted to a "
+            "university with a strong environmental programme and intend to pursue graduate "
+            "research in soil remediation. This scholarship would cover the gap between my "
+            "financial aid package and actual cost of attendance."
         ),
         extracurriculars=[
-            "Environmental Justice Coalition (secretary)",
-            "Creek cleanup volunteer (150+ hours)",
-            "Undergraduate research symposium presenter",
+            "Environmental Club (secretary)",
+            "Creek and park cleanup volunteer — 140 hours",
+            "Science fair competitor — 3 years",
         ],
-        work_experience="Lab assistant, Environmental Chemistry Lab (18 months)",
+        work_experience="Lawn care and yard work, self-employed since age 14",
         recommendation_summary=(
-            "Dr. Nguyen highlights James's research initiative and improvement trajectory. "
-            "Notes he is 'more prepared for graduate research than most seniors.' "
-            "Strong recommendation."
+            "Dr. Nguyen, AP Environmental Science teacher, highlights James's academic "
+            "turnaround and his independent research instinct. Notes his biochar project "
+            "showed 'genuine scientific curiosity beyond the curriculum.' Strong recommendation."
         ),
-        awards=["Best Undergraduate Poster — Regional Environmental Conference"],
+        awards=["Regional Science Fair — Best Environmental Project"],
     ),
 
-    # ── 7. Low financial need, high merit — expected MEDIUM confidence ────────
+    # ── 7. High merit, lower need — MEDIUM confidence ────────────────────────
     Application(
         id="APP-007",
         name="Claire Hoffman",
-        age=20,
+        age=17,
         gpa=3.92,
-        major="Neuroscience",
-        year="Sophomore",
+        major="Intended: Neuroscience",
+        year="High School Senior",
         annual_household_income=145_000,
         dependents=0,
         essay=(
-            "I am applying despite knowing my family's income may disadvantage my "
-            "application. My research commitment speaks for itself: I have co-authored "
-            "two peer-reviewed papers on hippocampal neurogenesis as an undergraduate. "
-            "I plan to pursue an MD-PhD and focus on early Alzheimer's detection. "
-            "The scholarship funds would go entirely toward conference travel and "
-            "research consumables — not living expenses. I believe merit should also "
-            "be considered alongside need."
+            "I am applying knowing my household income may work against me in a needs-based "
+            "review. I want to make the case on merit. At 16, I joined a university "
+            "neuroscience lab through a summer research programme and co-authored a paper "
+            "on adolescent sleep patterns that has been accepted for publication. I plan to "
+            "pursue an MD-PhD focused on early Alzheimer's detection. The scholarship funds "
+            "would go entirely toward research expenses and conference travel — not living "
+            "costs, which my family can cover. I believe exceptional achievement and clear "
+            "scientific purpose should weigh alongside financial need."
         ),
         extracurriculars=[
-            "Neuroscience research lab (25 hrs/week)",
+            "University neuroscience lab (summer research programme, 2 years)",
             "Alzheimer's Association volunteer",
-            "Science Olympiad coach",
+            "Science Olympiad (team captain)",
         ],
-        work_experience="Undergraduate researcher (co-first author, 2 publications)",
+        work_experience="Research assistant, university lab (unpaid, summers)",
         recommendation_summary=(
-            "Dr. Osei describes Claire as 'the most productive undergraduate researcher "
-            "I have ever supervised' but acknowledges the scholarship committee's "
-            "financial need mandate. Strong academic endorsement."
+            "Dr. Osei, university lab supervisor, calls Claire 'the most capable high school "
+            "researcher I have mentored.' Notes the publication is genuine co-authorship. "
+            "Acknowledges the financial need question but endorses strongly on academic merit."
         ),
-        awards=["Phi Beta Kappa", "Outstanding Undergraduate Researcher Award"],
+        awards=["National Merit Scholar", "Science Olympiad — State Finalist", "Pending publication co-author"],
     ),
 
-    # ── 8. Late-stage career changer — expected LOW confidence ───────────────
+    # ── 8. Non-traditional GED — LOW confidence ──────────────────────────────
     Application(
         id="APP-008",
         name="Roberto Vásquez",
-        age=35,
+        age=21,
         gpa=3.70,
-        major="Nursing",
-        year="Junior",
+        major="Intended: Nursing",
+        year="GED Graduate (non-traditional)",
         annual_household_income=38_000,
         dependents=3,
         essay=(
-            "After 12 years as a construction foreman I returned to school to become a "
-            "nurse. My father died of a preventable complication because of a language "
-            "barrier with his care team. I want to be the bilingual nurse who bridges "
-            "that gap. Balancing school with three children under 10 is hard. My GPA "
-            "of 3.7 represents work done after 10-hour days. My clinical supervisors "
-            "say I have the best patient communication skills they have seen in a "
-            "pre-licensure student. I need this scholarship to replace the income I "
-            "lose by reducing shifts during my final clinical rotations."
+            "I left high school at 17 to work construction and help support my family after "
+            "my father was injured on the job. At 20 I completed my GED with a 3.7 weighted "
+            "score and was accepted into a nursing programme starting this fall. My father "
+            "died last year from a preventable complication because no one on his care team "
+            "spoke Spanish. I want to be the bilingual nurse who closes that gap. I have "
+            "spent the past year volunteering as a patient navigator at a community clinic "
+            "and the staff there encouraged me to pursue nursing formally. I know my path "
+            "here was not straight. I believe it makes me a better candidate for this work, "
+            "not a worse one."
         ),
         extracurriculars=[
-            "Spanish-language patient navigation volunteer",
-            "Nursing students association",
+            "Spanish-language patient navigator, community clinic (volunteer)",
+            "Construction crew lead — managed 3-person team",
         ],
-        work_experience=(
-            "Construction foreman (12 years); Current: part-time patient care technician"
-        ),
+        work_experience="Construction worker, full-time 3 years; patient navigator, part-time 1 year",
         recommendation_summary=(
-            "Clinical supervisor emphasizes Roberto's extraordinary empathy and "
-            "communication, and the unusual context of his non-traditional path. "
-            "Enthusiastic recommendation with note that rubric criteria may undervalue "
-            "his profile."
+            "Clinic director emphasises Roberto's empathy, language skills, and reliability. "
+            "Notes his non-traditional background is an asset for community health work. "
+            "Enthusiastic recommendation with candid acknowledgement that standard rubric "
+            "criteria may undervalue this profile."
         ),
-        awards=["Clinical Excellence Recognition — University Hospital"],
+        awards=["GED with Distinction — Adult Education Programme"],
     ),
 
-    # ── 9. Solid all-rounder — expected HIGH confidence APPROVED ─────────────
+    # ── 9. Solid all-rounder — HIGH confidence APPROVED ──────────────────────
     Application(
         id="APP-009",
         name="Destiny Washington",
-        age=22,
+        age=18,
         gpa=3.75,
-        major="Social Work",
-        year="Senior",
+        major="Intended: Social Work",
+        year="High School Senior",
         annual_household_income=31_000,
         dependents=2,
         essay=(
-            "I aged out of foster care at 18 and enrolled in university three weeks later. "
-            "I have since built a life I'm proud of: a 3.75 GPA, a published op-ed on "
-            "foster care reform in the state newspaper, and a practicum at a child welfare "
-            "agency where I helped redesign their youth transition checklist. I want to "
-            "become a licensed clinical social worker specializing in adolescent trauma. "
-            "This scholarship would close the gap between my aid package and actual cost "
-            "of attendance so I can graduate debt-free and enter public service without "
-            "financial pressure forcing me toward private practice."
+            "I have been in the foster care system since I was nine. I aged out at eighteen "
+            "and enrolled in my senior year of high school six weeks later. I graduated with "
+            "a 3.75 GPA, was accepted to three universities, and was told by my placement "
+            "social worker that I was 'one of the success stories.' I do not feel like a "
+            "success story. I feel like someone who did not have enough support and got lucky. "
+            "I want to study social work so I can redesign the systems that failed me and the "
+            "other kids I grew up alongside. I have published an op-ed on foster care reform "
+            "in our city newspaper and co-founded a peer mentorship group for current foster "
+            "youth. This scholarship means I can attend university without debt that would "
+            "force me into private practice instead of public service."
         ),
         extracurriculars=[
-            "Foster Youth Advocacy Network (co-founder)",
-            "University trauma-informed care workshop facilitator",
-            "Big Brothers Big Sisters mentor",
+            "Foster Youth Peer Mentorship Network (co-founder)",
+            "Big Brothers Big Sisters — youth mentor",
+            "School newspaper (opinion editor)",
         ],
-        work_experience="Child welfare practicum intern (400 hours)",
+        work_experience="Part-time retail, 20 hrs/week (senior year)",
         recommendation_summary=(
-            "Field supervisor calls Destiny 'a future leader in social work' who brings "
-            "lived experience and professional skill in equal measure. Strongest possible "
-            "recommendation."
+            "Ms. Rivera, school counselor, calls Destiny 'the most resilient and purposeful "
+            "student I have worked with in 15 years.' Highlights the op-ed, the mentorship "
+            "programme, and the context of aging out of foster care while maintaining academic "
+            "excellence. Strongest possible recommendation."
         ),
-        awards=["NASW Student of the Year — State Chapter", "Dean's List (3 semesters)"],
+        awards=["Published op-ed — City Newspaper", "NASW Youth Leadership Award"],
     ),
 
-    # ── 10. Incomplete / inconsistent — expected LOW confidence ──────────────
+    # ── 10. Vague / incomplete — MEDIUM confidence DECLINED ──────────────────
     Application(
         id="APP-010",
         name="Devon Calloway",
-        age=20,
+        age=18,
         gpa=3.10,
-        major="Business Administration",
-        year="Sophomore",
+        major="Intended: Business",
+        year="High School Senior",
         annual_household_income=55_000,
         dependents=0,
         essay=(
-            "I want to start a business one day. I think entrepreneurship is the key "
-            "to success. I have some ideas but haven't had time to develop them. "
-            "My grades are decent. I work part time at a coffee shop. I think this "
-            "scholarship would be a good investment in my future. I am a hard worker "
-            "and I think with the right support I could do great things."
+            "I want to go to college to study business and eventually start my own company. "
+            "I have always been interested in entrepreneurship. I work at a coffee shop and "
+            "have learned a lot about customer service. I think with the right education "
+            "I can achieve my goals. My grades are decent and I am a hard worker. I believe "
+            "I would make good use of this scholarship."
         ),
-        extracurriculars=["Intramural basketball"],
+        extracurriculars=["Intramural basketball", "School pep club"],
         work_experience="Barista, part-time (1 year)",
         recommendation_summary=(
-            "Academic advisor provides a brief letter noting Devon 'shows up to meetings "
-            "and is generally positive.' No substantive achievements or specific qualities "
-            "described. Letter appears template-generated."
+            "School counselor provides a brief letter noting Devon 'is a pleasant student "
+            "who shows up on time and works well with others.' No specific achievements, "
+            "leadership experiences, or academic strengths are cited. Letter appears "
+            "template-generated."
         ),
         awards=[],
     ),
