@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Astronaut Selection Platform — Architecture Overview</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --navy: #1a375e; --blue: #2e75b6; --teal: #007080;
+  --green: #2e7d32; --orange: #e65100; --red: #c62828;
+  --grey: #444; --lgrey: #f4f6f9; --border: #dde4ef;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+html { scroll-behavior: smooth; }
+body { font-family: var(--font); background: var(--lgrey); color: var(--grey); line-height: 1.6; }
+
+/* ── Nav ── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  background: var(--navy); color: #cdd9ea;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 28px; height: 54px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.2);
+}
+.nav-logo { font-size: 15px; font-weight: 700; color: #fff; display:flex; align-items:center; gap:8px; }
+.nav-links { display: flex; gap: 20px; }
+.nav-links a { font-size: 12px; color: #8aabcc; text-decoration: none; font-weight: 600;
+               letter-spacing: .04em; text-transform: uppercase; transition: color .2s; }
+.nav-links a:hover { color: #fff; }
+.nav-cta { background: var(--blue); color: #fff; padding: 7px 16px; border-radius: 6px;
+           font-size: 12px; font-weight: 700; text-decoration: none; transition: opacity .2s; }
+.nav-cta:hover { opacity: .85; }
+
+/* ── Hero ── */
+.hero {
+  min-height: 100vh; background: linear-gradient(160deg, #0d1f3c 0%, #1a375e 50%, #2e75b6 100%);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; padding: 80px 24px 60px;
+}
+.hero-badge {
+  background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.2);
+  color: #8aabcc; font-size: 11px; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; padding: 6px 14px; border-radius: 20px; margin-bottom: 24px;
+}
+.hero h1 { font-size: clamp(28px, 5vw, 52px); font-weight: 800; color: #fff;
+            line-height: 1.2; margin-bottom: 16px; max-width: 800px; }
+.hero h1 span { color: #5baee8; }
+.hero p { font-size: clamp(14px, 2vw, 18px); color: #8aabcc; max-width: 580px;
+          margin: 0 auto 36px; }
+.hero-btns { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+.btn-primary { background: var(--blue); color: #fff; padding: 13px 28px; border-radius: 8px;
+               font-size: 14px; font-weight: 700; text-decoration: none; transition: all .2s; }
+.btn-primary:hover { background: #1a5fa0; transform: translateY(-1px); }
+.btn-secondary { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.25);
+                 color: #cdd9ea; padding: 13px 28px; border-radius: 8px; font-size: 14px;
+                 font-weight: 600; text-decoration: none; transition: all .2s; }
+.btn-secondary:hover { background: rgba(255,255,255,.18); }
+.hero-stats { display: flex; gap: 40px; margin-top: 56px; flex-wrap: wrap; justify-content: center; }
+.stat { text-align: center; }
+.stat-n { font-size: 32px; font-weight: 800; color: #fff; }
+.stat-l { font-size: 11px; color: #8aabcc; text-transform: uppercase; letter-spacing: .06em; margin-top: 2px; }
+
+/* ── Sections ── */
+.section { padding: 72px 24px; max-width: 980px; margin: 0 auto; }
+.section-label { font-size: 11px; font-weight: 700; text-transform: uppercase;
+                 letter-spacing: .1em; color: var(--blue); margin-bottom: 8px; }
+.section h2 { font-size: clamp(22px, 3vw, 32px); font-weight: 800; color: var(--navy);
+              margin-bottom: 16px; line-height: 1.25; }
+.section-intro { font-size: 16px; color: #666; max-width: 680px; margin-bottom: 40px; line-height: 1.7; }
+
+/* ── Pipeline ── */
+.pipeline { display: flex; flex-direction: column; gap: 0; position: relative; }
+.pipeline-step {
+  display: grid; grid-template-columns: 80px 1fr; gap: 0; align-items: stretch;
+  border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+  background: #fff; margin-bottom: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+  transition: box-shadow .2s;
+}
+.pipeline-step:hover { box-shadow: 0 4px 16px rgba(0,0,0,.1); }
+.step-num {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: #fff; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-align: center;
+  padding: 16px 8px; gap: 4px;
+}
+.step-num .num { font-size: 22px; font-weight: 900; }
+.step-body { padding: 18px 22px; }
+.step-name { font-size: 15px; font-weight: 700; color: var(--navy); margin-bottom: 4px; }
+.step-desc { font-size: 13px; color: #666; line-height: 1.6; }
+
+/* ── Signal cards ── */
+.signal-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+.signal-card {
+  background: #fff; border: 1px solid var(--border); border-radius: 10px;
+  padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+.signal-card .sig-icon { font-size: 28px; margin-bottom: 10px; }
+.signal-card .sig-type { font-size: 10px; font-weight: 700; text-transform: uppercase;
+                          letter-spacing: .08em; padding: 3px 10px; border-radius: 10px;
+                          display: inline-block; margin-bottom: 10px; }
+.sig-quant .sig-type { background: #dbeafe; color: var(--blue); }
+.sig-qual  .sig-type  { background: #ccf0f3; color: var(--teal); }
+.signal-card h4 { font-size: 14px; font-weight: 700; color: var(--navy); margin-bottom: 6px; }
+.signal-card p { font-size: 12.5px; color: #666; line-height: 1.55; }
+
+/* ── Routing tiers ── */
+.tiers-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; }
+.tier-card {
+  border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  transition: box-shadow .2s;
+}
+.tier-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,.14); }
+.tier-head { padding: 16px 18px 12px; }
+.tier-head h4 { font-size: 12px; font-weight: 800; letter-spacing: .08em;
+                text-transform: uppercase; color: #fff; margin-bottom: 4px; }
+.tier-head .tier-badge { font-size: 10px; color: rgba(255,255,255,.75);
+                          background: rgba(255,255,255,.15); border-radius: 10px;
+                          padding: 2px 8px; display: inline-block; }
+.tier-body { background: #fff; padding: 14px 18px; min-height: 90px; }
+.tier-body p { font-size: 12.5px; color: #555; line-height: 1.6; }
+
+/* ── Controls ── */
+.controls-list { display: flex; flex-direction: column; gap: 0; }
+.ctrl {
+  display: grid; grid-template-columns: 200px 1fr; gap: 0;
+  border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+  background: #fff; margin-bottom: 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.05);
+}
+.ctrl-label { background: #f0f6fc; padding: 16px 18px; border-right: 1px solid var(--border); }
+.ctrl-label h4 { font-size: 13px; font-weight: 700; color: var(--navy); margin-bottom: 4px; }
+.ctrl-label .ctrl-range { font-size: 10px; color: var(--blue); font-weight: 600; }
+.ctrl-desc { padding: 16px 20px; font-size: 13px; color: #555; line-height: 1.6; }
+
+/* ── Presets ── */
+.presets-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.preset-card {
+  background: #fff; border: 1px solid var(--border); border-radius: 10px;
+  overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.06);
+  transition: box-shadow .2s;
+}
+.preset-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.1); }
+.preset-head { padding: 16px 20px 12px; }
+.preset-head h4 { font-size: 14px; font-weight: 800; color: #fff; }
+.preset-head p  { font-size: 11px; color: rgba(255,255,255,.8); margin-top: 3px; }
+.preset-body { padding: 16px 20px; }
+.preset-body p { font-size: 13px; color: #555; line-height: 1.6; }
+.preset-params { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.param-chip { background: var(--lgrey); border: 1px solid var(--border); border-radius: 5px;
+              padding: 3px 9px; font-size: 11px; color: var(--navy); font-weight: 600; }
+
+/* ── Use cases ── */
+.use-cases { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.uc-card {
+  background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.05); transition: box-shadow .2s;
+}
+.uc-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,.1); }
+.uc-icon { font-size: 26px; margin-bottom: 10px; }
+.uc-card h4 { font-size: 14px; font-weight: 700; color: var(--navy); margin-bottom: 6px; }
+.uc-card p  { font-size: 12.5px; color: #666; line-height: 1.55; }
+
+/* ── Candidates table ── */
+.cands-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.cands-table th { background: var(--navy); color: #fff; padding: 10px 14px;
+                   text-align: left; font-weight: 600; font-size: 11px;
+                   text-transform: uppercase; letter-spacing: .05em; }
+.cands-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.cands-table tr:hover td { background: #f0f6fc; }
+.highlight-row { background: #fef9e7; }
+.cands-table .badge {
+  padding: 2px 9px; border-radius: 10px; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em;
+}
+.badge-tension { background: #fff3e0; color: var(--orange); }
+.badge-strong  { background: #e8f5e9; color: var(--green); }
+.badge-anchor  { background: #e8f5e9; color: var(--green); }
+
+/* ── Callout ── */
+.callout {
+  background: linear-gradient(135deg, #e8f4fd, #daf0f3);
+  border-left: 4px solid var(--blue); border-radius: 0 8px 8px 0;
+  padding: 20px 24px; margin: 24px 0;
+}
+.callout p { font-size: 14.5px; color: var(--navy); line-height: 1.7; font-style: italic; }
+
+/* ── Footer ── */
+footer {
+  background: var(--navy); color: #8aabcc; text-align: center;
+  padding: 32px 24px; font-size: 12px; line-height: 1.8;
+}
+footer a { color: #5baee8; text-decoration: none; }
+
+/* ── Section divider ── */
+.divider { height: 1px; background: var(--border); max-width: 980px;
+           margin: 0 auto; }
+
+/* ── Dark band ── */
+.dark-band {
+  background: var(--navy); color: #cdd9ea; padding: 64px 24px;
+}
+.dark-band .section { max-width: 980px; margin: 0 auto; }
+.dark-band .section-label { color: #5baee8; }
+.dark-band h2 { color: #fff; }
+.dark-band .section-intro { color: #8aabcc; }
+
+@media (max-width: 640px) {
+  .ctrl { grid-template-columns: 1fr; }
+  .ctrl-label { border-right: none; border-bottom: 1px solid var(--border); }
+  nav .nav-links { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">🚀 Astronaut Selection Platform</div>
+  <div class="nav-links">
+    <a href="#architecture">Architecture</a>
+    <a href="#signals">Signals</a>
+    <a href="#routing">Routing</a>
+    <a href="#presets">Presets</a>
+    <a href="#usecases">Use Cases</a>
+  </div>
+  <a class="nav-cta" href="#demo">Launch Demo →</a>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-badge">IEA Group 7 Selection Platform · Agentic AI Portfolio</div>
+  <h1>AI that knows when to<br><span>call a human</span></h1>
+  <p>A complete agentic evaluation pipeline: multi-agent analysis, policy-driven routing, human-AI collaboration, and calibration — in one system.</p>
+  <div class="hero-btns">
+    <a class="btn-primary" href="#demo" id="demo">Launch Live Demo →</a>
+    <a class="btn-secondary" href="#architecture">Explore Architecture ↓</a>
+  </div>
+  <div class="hero-stats">
+    <div class="stat"><div class="stat-n">4</div><div class="stat-l">AI Agents</div></div>
+    <div class="stat"><div class="stat-n">4</div><div class="stat-l">Routing Tiers</div></div>
+    <div class="stat"><div class="stat-n">3</div><div class="stat-l">Policy Presets</div></div>
+    <div class="stat"><div class="stat-n">10</div><div class="stat-l">Candidates</div></div>
+  </div>
+</section>
+
+<!-- ARCHITECTURE -->
+<section class="section" id="architecture">
+  <div class="section-label">Architecture</div>
+  <h2>Four agents. One typed pipeline.</h2>
+  <p class="section-intro">Each application passes through four agents in sequence. Each agent has a single responsibility and hands a typed artefact to the next. No agent touches implementation details outside its stage.</p>
+
+  <div class="pipeline">
+    <div class="pipeline-step">
+      <div class="step-num" style="background:#1a375e"><div class="num">1</div>Analysis</div>
+      <div class="step-body">
+        <div class="step-name">Analysis Agent</div>
+        <div class="step-desc">Reads the raw application and extracts structured evidence across four dimensions: Technical Expertise, Physical &amp; Medical Fitness, Mission Experience, and Psychological Readiness. Produces a typed <code>Evidence</code> object with key strengths, key concerns, and an overall narrative. Purely extractive — no scoring yet.</div>
+      </div>
+    </div>
+    <div class="pipeline-step">
+      <div class="step-num" style="background:#2e75b6"><div class="num">2</div>Scoring</div>
+      <div class="step-body">
+        <div class="step-name">Scoring Agent</div>
+        <div class="step-desc">Receives the Evidence object and applies a 100-point rubric (0–25 per dimension). Produces an AI recommendation, a confidence score (0.0–1.0), and a reasoning string. In live mode this is a real LLM call. In stub mode it uses a deterministic formula — demos run without any API key.</div>
+      </div>
+    </div>
+    <div class="pipeline-step">
+      <div class="step-num" style="background:#007080"><div class="num">3</div>Signals</div>
+      <div class="step-body">
+        <div class="step-name">Signal Evaluator</div>
+        <div class="step-desc">Computes a composite risk score from three components: confidence uncertainty (35%), decision sensitivity — how close the total score is to a threshold (35%), and inter-dimension disagreement (30%). This risk score, <em>not</em> the total score, drives the routing decision.</div>
+      </div>
+    </div>
+    <div class="pipeline-step">
+      <div class="step-num" style="background:#2e7d32"><div class="num">4</div>Routing</div>
+      <div class="step-body">
+        <div class="step-name">Routing &amp; Human Review</div>
+        <div class="step-desc">Maps the risk score to one of four tiers. Tiers requiring human involvement trigger the Human Review Layer: a policy-aware reviewer with a systematic bias and review style. Agreement with the AI recommendation is tracked and feeds the calibration report.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <p>"The server never streams responses directly. POST /api/evaluate starts a background thread and returns a job ID immediately. The browser polls every 800 ms. This eliminates SSE buffering issues on Railway, Heroku, and any reverse proxy — no special server configuration required."</p>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- SIGNAL HIERARCHY -->
+<section class="section" id="signals">
+  <div class="section-label">Signal Hierarchy</div>
+  <h2>Verifiable vs. assessed evidence.</h2>
+  <p class="section-intro">The most architecturally significant design decision: the explicit, user-controlled weighting between quantitative and qualitative signals. A single <strong>quant_weight</strong> slider (0.40–0.80) shifts the balance — and changes who gets selected.</p>
+
+  <div class="signal-grid">
+    <div class="signal-card sig-quant">
+      <div class="sig-icon">🔢</div>
+      <span class="sig-type">Quantitative</span>
+      <h4>Technical Expertise</h4>
+      <p>Flight hours, degree credentials. Objective and independently verifiable — cannot be gamed by good writing.</p>
+    </div>
+    <div class="signal-card sig-quant">
+      <div class="sig-icon">🔢</div>
+      <span class="sig-type">Quantitative</span>
+      <h4>Physical &amp; Medical</h4>
+      <p>Fitness score (0–100), medical clearance status. Ground truth anchors that hold the qualitative signals accountable.</p>
+    </div>
+    <div class="signal-card sig-qual">
+      <div class="sig-icon">📝</div>
+      <span class="sig-type">Qualitative</span>
+      <h4>Mission Experience</h4>
+      <p>Specializations, prior missions, commendations. Assessed — captures operational context that numbers miss.</p>
+    </div>
+    <div class="signal-card sig-qual">
+      <div class="sig-icon">📝</div>
+      <span class="sig-type">Qualitative</span>
+      <h4>Psychological Readiness</h4>
+      <p>Personal statement, psychological profile. Assessed — surfaces judgment, resilience, and self-awareness.</p>
+    </div>
+  </div>
+
+  <div style="margin-top:28px; background:#fff; border:1px solid var(--border); border-radius:10px; padding:22px 24px; box-shadow:0 1px 4px rgba(0,0,0,.06)">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px">
+      <strong style="font-size:13px; color:var(--navy)">Signal Hierarchy Slider: quant_weight</strong>
+      <span style="font-size:11px; color:#888">Range: 0.40 → 0.80</span>
+    </div>
+    <div style="background:var(--lgrey); border-radius:6px; overflow:hidden; height:28px; display:flex">
+      <div style="width:55%; background:var(--blue); display:flex; align-items:center; justify-content:center">
+        <span style="font-size:11px; font-weight:700; color:#fff">🔢 Quantitative 55%</span>
+      </div>
+      <div style="width:45%; background:var(--teal); display:flex; align-items:center; justify-content:center">
+        <span style="font-size:11px; font-weight:700; color:#fff">📝 Qualitative 45%</span>
+      </div>
+    </div>
+    <p style="font-size:12px; color:#888; margin-top:8px">This is the Initial Screening default. At Deep Space (0.72), verifiable data dominates. Watch <strong>Dr. Priya Sharma vs. Tom Briggs</strong> as you move it.</p>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- POLICY SEPARATION -->
+<section class="section" id="presets">
+  <div class="section-label">Policy Separation</div>
+  <h2>Every rule lives in a dataclass.</h2>
+  <p class="section-intro">Approval thresholds, signal weights, review rates — none are hardcoded into the agents. They live in a <code>ProgramPolicy</code> dataclass. Swapping a preset changes the system's behaviour across every dimension simultaneously, without touching implementation code.</p>
+
+  <div class="presets-grid">
+    <div class="preset-card">
+      <div class="preset-head" style="background:var(--navy)">
+        <h4>Initial Screening</h4>
+        <p>High volume, early-funnel</p>
+      </div>
+      <div class="preset-body">
+        <p>Generous approval threshold, balanced signal hierarchy, low auto-decision ceiling. Processes a large applicant pool efficiently, reserving human review for genuine borderline cases.</p>
+        <div class="preset-params">
+          <span class="param-chip">Threshold ≥65</span>
+          <span class="param-chip">quant 0.55</span>
+          <span class="param-chip">Low friction</span>
+        </div>
+      </div>
+    </div>
+    <div class="preset-card">
+      <div class="preset-head" style="background:var(--blue)">
+        <h4>Mission Assignment</h4>
+        <p>Specific crew slot</p>
+      </div>
+      <div class="preset-body">
+        <p>Elevated threshold, increased human review on borderlines. Calibrated for situations where every admit will actually be assigned to a mission. Operational readiness weighted higher.</p>
+        <div class="preset-params">
+          <span class="param-chip">Threshold ≥70</span>
+          <span class="param-chip">quant 0.65</span>
+          <span class="param-chip">More review</span>
+        </div>
+      </div>
+    </div>
+    <div class="preset-card">
+      <div class="preset-head" style="background:var(--teal)">
+        <h4>Deep Space Programme</h4>
+        <p>Multi-year, high-risk mission</p>
+      </div>
+      <div class="preset-body">
+        <p>Most rigorous tier. Strict reviewer pool, highest threshold, quantitative signals dominate. Flight hours, fitness scores, and medical clearance are decisive. Zero margin for error.</p>
+        <div class="preset-params">
+          <span class="param-chip">Threshold ≥74</span>
+          <span class="param-chip">quant 0.72</span>
+          <span class="param-chip">Strict pool</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ROUTING TIERS - dark band -->
+<div class="dark-band" id="routing">
+  <div class="section">
+    <div class="section-label">Routing Engine</div>
+    <h2>Four tiers. Calibrated uncertainty.</h2>
+    <p class="section-intro">After scoring, the Signal Evaluator computes a composite risk score — a measure of how much the system trusts its own assessment, not the score itself. High risk = high uncertainty = more human.</p>
+
+    <div class="tiers-grid">
+      <div class="tier-card">
+        <div class="tier-head" style="background:var(--navy)">
+          <h4>Auto Decision</h4>
+          <div class="tier-badge">Low composite risk</div>
+        </div>
+        <div class="tier-body">
+          <p>Confident assessment, score well clear of thresholds, dimensions agree. AI recommendation is final. A configurable spot-check rate still routes a fraction for calibration.</p>
+        </div>
+      </div>
+      <div class="tier-card">
+        <div class="tier-head" style="background:var(--blue)">
+          <h4>Parallel Review</h4>
+          <div class="tier-badge">Moderate risk</div>
+        </div>
+        <div class="tier-body">
+          <p>Human and AI evaluate independently and concurrently. Both outcomes recorded. Agreement tracked. This is where most of the interesting calibration data comes from.</p>
+        </div>
+      </div>
+      <div class="tier-card">
+        <div class="tier-head" style="background:var(--teal)">
+          <h4>Escalation</h4>
+          <div class="tier-badge">Elevated risk</div>
+        </div>
+        <div class="tier-body">
+          <p>Human-led, AI-advisory. The reviewer is given AI analysis as context but expected to exercise independent judgement. Override reasons are recorded when outcomes diverge.</p>
+        </div>
+      </div>
+      <div class="tier-card">
+        <div class="tier-head" style="background:var(--red)">
+          <h4>Senior Adjudication</h4>
+          <div class="tier-badge">Maximum risk</div>
+        </div>
+        <div class="tier-body">
+          <p>Senior reviewer pool — strict and balanced archetypes only. Typical cases: conditional clearances, exceptional profiles with critical gaps, deep inter-dimension disagreement.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CONTROLS -->
+<section class="section">
+  <div class="section-label">Controls</div>
+  <h2>What each control does.</h2>
+  <p class="section-intro">Every UI control directly modifies a field in <code>ProgramPolicy</code>. Each has a meaningful, observable effect on routing, scoring, and human review volume.</p>
+
+  <div class="controls-list">
+    <div class="ctrl">
+      <div class="ctrl-label">
+        <h4>Programme Preset</h4>
+        <div class="ctrl-range">3 named configurations</div>
+      </div>
+      <div class="ctrl-desc">Loads a complete ProgramPolicy — changes all other controls simultaneously. Start here. The preset establishes operational context; the sliders fine-tune from that baseline.</div>
+    </div>
+    <div class="ctrl">
+      <div class="ctrl-label">
+        <h4>Signal Hierarchy</h4>
+        <div class="ctrl-range">quant_weight: 0.40–0.80</div>
+      </div>
+      <div class="ctrl-desc">Shifts scoring weight between verifiable data and assessed evidence. Move left → qualitative candidates gain ground. Move right → flight hours and fitness scores dominate. Watch Dr. Sharma vs. Tom Briggs.</div>
+    </div>
+    <div class="ctrl">
+      <div class="ctrl-label">
+        <h4>Approval Threshold</h4>
+        <div class="ctrl-range">0–100 score cutoff</div>
+      </div>
+      <div class="ctrl-desc">Raises or lowers the bar for an Approved outcome. Raising it flips borderline approvals to waitlisted, increases composite risk scores, and pushes more cases into higher routing tiers. Routing and scoring are coupled.</div>
+    </div>
+    <div class="ctrl">
+      <div class="ctrl-label">
+        <h4>Human Review Rate</h4>
+        <div class="ctrl-range">0–100% of auto cases</div>
+      </div>
+      <div class="ctrl-desc">The calibration lever. Sets the fraction of Auto Decision cases that receive a spot-check review, generating human-AI agreement data on cases the system was already confident about.</div>
+    </div>
+    <div class="ctrl">
+      <div class="ctrl-label">
+        <h4>Mode</h4>
+        <div class="ctrl-range">Stub / Live</div>
+      </div>
+      <div class="ctrl-desc">Stub: deterministic agents, no API key, fast and reproducible. Live: real Claude API calls, genuine LLM reasoning. Architecture identical in both modes — only the agent implementation changes.</div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- CANDIDATES -->
+<section class="section">
+  <div class="section-label">Candidates</div>
+  <h2>10 profiles designed to surface every edge case.</h2>
+  <p class="section-intro">The mock candidates span the full score spectrum and are designed to exercise every part of the pipeline — including the most architecturally interesting cases.</p>
+
+  <div style="overflow-x:auto">
+  <table class="cands-table">
+    <thead>
+      <tr>
+        <th>ID</th><th>Candidate</th><th>Flight Hrs</th><th>Fitness</th><th>Medical</th><th>Prior Missions</th><th>Tension</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>IEA-001</td><td><strong>Dr. Sarah Chen</strong></td><td>2,450</td><td>94.0</td><td>Full</td><td>1</td><td><span class="badge badge-strong">High confidence</span></td></tr>
+      <tr><td>IEA-002</td><td>Marcus Webb</td><td>820</td><td>78.5</td><td>Full</td><td>0</td><td><span class="badge badge-tension">Some gaps</span></td></tr>
+      <tr><td>IEA-003</td><td>Dr. Elena Vasquez</td><td>310</td><td>81.0</td><td>Full</td><td>0</td><td><span class="badge badge-tension">Low hrs, strong qual</span></td></tr>
+      <tr><td>IEA-004</td><td>James Okafor</td><td>1,650</td><td>88.0</td><td>Full</td><td>0</td><td><span class="badge badge-strong">Well-rounded</span></td></tr>
+      <tr class="highlight-row"><td>IEA-005</td><td><strong>Dr. Priya Sharma ⭐</strong></td><td>180</td><td>72.0</td><td>Conditional</td><td>0</td><td><span class="badge badge-tension">Quant/qual tension</span></td></tr>
+      <tr class="highlight-row"><td>IEA-006</td><td><strong>Tom Briggs ⭐</strong></td><td>3,280</td><td>96.5</td><td>Full</td><td>0</td><td><span class="badge badge-tension">High quant, low qual</span></td></tr>
+      <tr><td>IEA-007</td><td>Yuki Tanaka</td><td>590</td><td>83.0</td><td>Full</td><td>0</td><td><span class="badge badge-tension">Below threshold</span></td></tr>
+      <tr><td>IEA-008</td><td><strong>Carlos Mendez ⭐</strong></td><td>1,920</td><td>91.0</td><td>Full</td><td>2</td><td><span class="badge badge-anchor">Auto Decision anchor</span></td></tr>
+      <tr><td>IEA-009</td><td>Dr. Aisha Nkosi</td><td>145</td><td>76.0</td><td>Full</td><td>1</td><td><span class="badge badge-tension">Payload specialist</span></td></tr>
+      <tr><td>IEA-010</td><td>Rachel Kim</td><td>1,120</td><td>86.0</td><td>Full</td><td>0</td><td><span class="badge badge-strong">Strong profile</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p style="font-size:12px; color:#999; margin-top:10px">⭐ Most instructive cases. Run these first. Switch presets and watch the routing tiers change.</p>
+</section>
+
+<!-- USE CASES -->
+<section class="section" id="usecases">
+  <div class="section-label">Domain Portability</div>
+  <h2>This is not about astronauts.</h2>
+  <p class="section-intro">The astronaut domain was chosen because it is obviously fictional (no IP risk), architecturally rich (genuine quant/qual tension), and memorable. Every component maps directly to any domain where AI assists in evaluating people at scale.</p>
+
+  <div class="use-cases">
+    <div class="uc-card">
+      <div class="uc-icon">🎓</div>
+      <h4>Scholarship &amp; Grant Matching</h4>
+      <p>GPA and income replace flight hours and fitness. Essays replace personal statements. Approval thresholds map to award budgets. This is the original domain the architecture was built for.</p>
+    </div>
+    <div class="uc-card">
+      <div class="uc-icon">🏥</div>
+      <h4>Clinical Trial Recruitment</h4>
+      <p>Inclusion/exclusion criteria are quantitative. Patient motivation and self-reported history are qualitative. The routing engine handles borderline clinical cases for physician review.</p>
+    </div>
+    <div class="uc-card">
+      <div class="uc-icon">💼</div>
+      <h4>Executive Hiring</h4>
+      <p>Compensation benchmarks and tenure are quantitative. Leadership assessments and references are qualitative. The signal hierarchy makes the data-vs-culture-fit tension explicit.</p>
+    </div>
+    <div class="uc-card">
+      <div class="uc-icon">🚀</div>
+      <h4>Accelerator Screening</h4>
+      <p>Traction metrics are quantitative. Founder narrative and team assessment are qualitative. Process hundreds of applications and route only genuinely ambiguous cases to partners.</p>
+    </div>
+    <div class="uc-card">
+      <div class="uc-icon">🎯</div>
+      <h4>Graduate Admissions</h4>
+      <p>Test scores and GPA are quantitative. Personal statements and recommendations are qualitative. The calibration system surfaces systematic committee divergences over time.</p>
+    </div>
+    <div class="uc-card">
+      <div class="uc-icon">📋</div>
+      <h4>Loan &amp; Credit Review</h4>
+      <p>Credit scores and income are quantitative. Business plans and extenuating circumstances are qualitative. Policy presets map directly to lending policy tiers and risk appetite.</p>
+    </div>
+  </div>
+</section>
+
+<!-- CALIBRATION -->
+<div class="dark-band">
+  <div class="section">
+    <div class="section-label">Calibration</div>
+    <h2>The system earns its autonomy.</h2>
+    <p class="section-intro">After every evaluation run the system produces a calibration report. This is how the system earns — or loses — the right to make autonomous decisions over time.</p>
+
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:16px; margin-top:8px">
+      <div style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:10px; padding:20px">
+        <div style="font-size:26px; margin-bottom:8px">📊</div>
+        <h4 style="font-size:13px; font-weight:700; color:#fff; margin-bottom:6px">Agreement Rate</h4>
+        <p style="font-size:12.5px; color:#8aabcc; line-height:1.55">Tracks AI recommendation vs. human outcome for every reviewed case. The metric that determines how much autonomy the system is granted.</p>
+      </div>
+      <div style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:10px; padding:20px">
+        <div style="font-size:26px; margin-bottom:8px">📐</div>
+        <h4 style="font-size:13px; font-weight:700; color:#fff; margin-bottom:6px">Score Divergence</h4>
+        <p style="font-size:12.5px; color:#8aabcc; line-height:1.55">Records the delta between AI total score and human-adjusted score across all reviewed cases. Surfaces systematic over- or under-scoring patterns.</p>
+      </div>
+      <div style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:10px; padding:20px">
+        <div style="font-size:26px; margin-bottom:8px">⚠️</div>
+        <h4 style="font-size:13px; font-weight:700; color:#fff; margin-bottom:6px">Disagreement Analysis</h4>
+        <p style="font-size:12.5px; color:#8aabcc; line-height:1.55">Surfaces every case where AI and human disagreed, with the reviewer's override reason. The input to rubric and weighting updates.</p>
+      </div>
+      <div style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:10px; padding:20px">
+        <div style="font-size:26px; margin-bottom:8px">📈</div>
+        <h4 style="font-size:13px; font-weight:700; color:#fff; margin-bottom:6px">Outcome Distribution</h4>
+        <p style="font-size:12.5px; color:#8aabcc; line-height:1.55">Shows how cases distributed across Approved / Waitlisted / Declined — and whether that distribution matches programme intent.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <p style="font-size:15px; font-weight:700; color:#fff; margin-bottom:6px">🚀 Astronaut Candidate Selection Platform</p>
+  <p>Agentic AI Portfolio · IEA Group 7 Selection Cycle</p>
+  <p style="margin-top:12px; font-style:italic; color:#6a8fb0">All candidate profiles, names, and data are entirely fictional.<br>The Interstellar Exploration Agency and IEA Group 7 are fabricated for demonstration purposes.</p>
+</footer>
+
+</body>
+</html>
