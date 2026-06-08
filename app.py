@@ -15,7 +15,7 @@ import traceback
 import threading
 import uuid
 from collections import deque
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_from_directory
 
 from scholarship_eval.mock_data import APPLICATIONS
 from scholarship_eval.models   import DecisionOutcome, ReviewType
