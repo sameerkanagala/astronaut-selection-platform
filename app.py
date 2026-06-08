@@ -198,6 +198,9 @@ def index():
 def health():
     return jsonify({"status": "ok"})
 
+@app.route("/about")
+def about():
+    return send_from_directory('static', 'about.html')
 
 @app.route("/api/applications")
 def list_applications():
