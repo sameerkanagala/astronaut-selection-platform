@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Scholarship Eval Platform</title>
+  <title>Astronaut Candidate Selection Platform</title>
   <style>
     /* ── Reset & Base ─────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -72,7 +72,7 @@
     .slider-val { display: inline-block; background: var(--blue); color: #fff;
                   padding: 1px 7px; border-radius: 10px; font-size: 11px; font-weight: 700; }
 
-    /* Applicant checkboxes */
+    /* Candidate checkboxes */
     .app-list { max-height: 220px; overflow-y: auto; padding-right: 4px; }
     .app-list::-webkit-scrollbar { width: 4px; }
     .app-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,.2); border-radius: 2px; }
@@ -335,8 +335,8 @@
   <!-- ══ SIDEBAR ══════════════════════════════════════════════ -->
   <aside class="sidebar">
     <div class="sidebar-header">
-      <h1>🎓 Scholarship Eval Platform</h1>
-      <p>Agentic AI Decision System</p>
+      <h1>🚀 Astronaut Selection Platform</h1>
+      <p>Agentic AI Candidate Evaluation · IEA Group 7</p>
     </div>
     <div class="sidebar-body">
 
@@ -364,21 +364,21 @@
       <!-- ── 1. Program Policy ──────────────────────────────────── -->
       <div class="acc open" id="acc-policy">
         <button class="acc-hdr" onclick="openAcc('policy')">
-          <span>🏛 Program Policy</span><span class="acc-chev">▾</span>
+          <span>🏛 Selection Policy</span><span class="acc-chev">▾</span>
         </button>
         <div class="acc-body">
           <div class="field">
             <label>Preset</label>
             <select id="preset-select" onchange="applyPreset(this.value)">
-              <option value="high_volume">High-Volume Merit Scholarship</option>
-              <option value="high_dollar">High-Dollar Grant Program</option>
-              <option value="regulatory">Regulatory / Compliance</option>
+              <option value="initial_screening">Initial Candidate Screening</option>
+              <option value="mission_assignment">Mission Assignment</option>
+              <option value="deep_space">Deep Space / Long-Duration</option>
               <option value="custom">Custom</option>
             </select>
           </div>
           <div class="field">
             <small style="font-size:10px;color:#6a9bbf;line-height:1.5;display:block" id="preset-desc">
-              Large applicant pool. AI automation encouraged for clear-cut cases.
+              Large candidate pool. AI automation encouraged for clear-cut cases.
             </small>
           </div>
         </div>
@@ -436,7 +436,7 @@
         </button>
         <div class="acc-body">
           <div class="field">
-            <label>Award Sensitivity</label>
+            <label>Mission Risk Sensitivity</label>
             <div class="toggle-row">
               <button class="toggle-btn active" id="sens-low"    onclick="setAwardSens('low',this)">Low</button>
               <button class="toggle-btn"        id="sens-medium" onclick="setAwardSens('medium',this)">Medium</button>
@@ -462,8 +462,8 @@
         </button>
         <div class="acc-body">
           <div style="font-size:10px;color:#6a9bbf;line-height:1.5;margin-bottom:8px">
-            Prevents over-indexing on unverifiable qualitative signals (essay, leadership)
-            vs structured quantitative data (GPA, financial records).
+            Prevents over-indexing on unverifiable qualitative signals (psychological, mission narrative)
+            vs structured quantitative data (flight hours, fitness scores).
           </div>
           <div class="field">
             <label>Quantitative Weight <span class="slider-val" id="quant-val">50%</span></label>
@@ -476,14 +476,14 @@
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:2px">
             <div style="background:rgba(46,117,182,.15);border:1px solid rgba(46,117,182,.3);border-radius:6px;padding:7px 8px">
               <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#5a9fd4;margin-bottom:3px">🔢 Quantitative</div>
-              <div style="font-size:10px;color:#aac8e0">Academic / GPA</div>
-              <div style="font-size:10px;color:#aac8e0">Financial Need</div>
+              <div style="font-size:10px;color:#aac8e0">Technical Expertise</div>
+              <div style="font-size:10px;color:#aac8e0">Physical &amp; Medical</div>
               <div style="font-size:9px;color:#5a85a8;margin-top:3px;font-style:italic">Verifiable data</div>
             </div>
             <div style="background:rgba(0,112,128,.15);border:1px solid rgba(0,112,128,.3);border-radius:6px;padding:7px 8px">
               <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#4aa8b4;margin-bottom:3px">📝 Qualitative</div>
-              <div style="font-size:10px;color:#aac8e0">Leadership</div>
-              <div style="font-size:10px;color:#aac8e0">Essay Quality</div>
+              <div style="font-size:10px;color:#aac8e0">Mission Experience</div>
+              <div style="font-size:10px;color:#aac8e0">Psychological Readiness</div>
               <div style="font-size:9px;color:#5a85a8;margin-top:3px;font-style:italic">Unverifiable signals</div>
             </div>
           </div>
@@ -553,10 +553,10 @@
         </div>
       </div>
 
-      <!-- ── Always visible: Applicants + Run ──────────────────── -->
+      <!-- ── Always visible: Candidates + Run ──────────────────── -->
       <div class="always-section">
         <div class="field">
-          <label>Applicants</label>
+          <label>Candidates</label>
           <div class="select-all-row">
             <input type="checkbox" id="select-all" checked onchange="toggleAll(this)">
             <label for="select-all">Select all</label>
@@ -577,7 +577,7 @@
     <div class="topbar">
       <div class="topbar-title">
         Results Dashboard
-        <span id="topbar-sub">Select applicants and click Run</span>
+        <span id="topbar-sub">Select candidates and click Run</span>
       </div>
       <div class="status-pill" id="status-pill">
         <div class="status-dot"></div>
@@ -592,7 +592,7 @@
         <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
           <path d="M9 12l2 2 4-4M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
         </svg>
-        <p>Configure settings and click <strong>Run Evaluation</strong> to begin</p>
+        <p>Configure settings and click <strong>Run Evaluation</strong> to begin screening candidates</p>
       </div>
 
       <!-- Results (hidden until run) -->
@@ -618,7 +618,7 @@
           <table class="results-table">
             <thead>
               <tr>
-                <th>ID</th><th>Applicant</th><th>Score</th>
+                <th>ID</th><th>Candidate</th><th>Score</th>
                 <th>Confidence</th><th>Risk</th><th>Routing Tier</th>
                 <th>AI Rec.</th><th>Final Decision</th><th>Agreement</th>
               </tr>
@@ -668,7 +668,7 @@ function renderAppList(apps) {
     <label class="app-check">
       <input type="checkbox" class="app-cb" value="${a.id}" checked>
       <span class="app-check-name">${a.name}</span>
-      <span class="app-check-meta">${a.gpa.toFixed(2)}</span>
+      <span class="app-check-meta">${a.flight_hours != null ? a.flight_hours.toLocaleString() + " hrs" : "—"}</span>
     </label>
   `).join('');
 }
@@ -787,7 +787,7 @@ let _pollInterval = null;
 
 function runEvaluation() {
   const ids = getSelectedIds();
-  if (!ids.length) { alert('Please select at least one applicant.'); return; }
+  if (!ids.length) { alert('Please select at least one candidate.'); return; }
   if (mode === 'live' && !document.getElementById('api-key').value.trim()) {
     alert('Please enter your Anthropic API key for live mode.'); return;
   }
@@ -849,7 +849,7 @@ function handleEvent(ev) {
     case 'processing':
       updateProgress(ev.index, ev.total, ev.app_id, ev.name, 'active');
       document.getElementById('topbar-sub').textContent =
-        `Processing ${ev.index} of ${ev.total}: ${ev.name}`;
+        `Processing candidate ${ev.index} of ${ev.total}: ${ev.name}`;
       break;
     case 'result':
       decisions.push(ev.decision);
@@ -865,7 +865,7 @@ function handleEvent(ev) {
       setStatus('done', `Done — ${decisions.length} evaluated`);
       setRunBtn(false);
       document.getElementById('topbar-sub').textContent =
-        `${decisions.length} applications evaluated`;
+        `${decisions.length} candidates evaluated`;
       break;
     case 'error':
       setStatus('error', 'Error occurred');
@@ -1004,19 +1004,23 @@ function buildAuditPanel(d) {
   const uid = d.app_id.replace('-','');
 
   // ── Tab: Application ──────────────────────────────────────────
+  const degLabels = ['Bachelor\'s', 'Master\'s', 'PhD', 'Dual PhD'];
+  const degStr = degLabels[appData.advanced_degrees] || (appData.advanced_degrees + ' degrees');
   const metaGrid = `
     <div class="app-meta-grid">
-      <div class="app-meta-card"><div class="val">${appData.gpa ? appData.gpa.toFixed(2) : '—'}</div><div class="lbl">GPA</div></div>
-      <div class="app-meta-card"><div class="val">$${appData.income ? appData.income.toLocaleString() : '—'}</div><div class="lbl">Household Income</div></div>
-      <div class="app-meta-card"><div class="val">${appData.dependents ?? '—'}</div><div class="lbl">Dependents</div></div>
+      <div class="app-meta-card"><div class="val">${appData.flight_hours != null ? appData.flight_hours.toLocaleString() : '—'}</div><div class="lbl">Flight Hours</div></div>
+      <div class="app-meta-card"><div class="val">${appData.physical_fitness_score != null ? appData.physical_fitness_score.toFixed(1) : '—'}</div><div class="lbl">Fitness Score</div></div>
+      <div class="app-meta-card"><div class="val">${appData.prior_missions ?? '—'}</div><div class="lbl">Prior Missions</div></div>
     </div>`;
 
   const basicInfo = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-      <div class="app-field"><div class="app-field-label">Major</div><div class="app-field-val">${appData.major || '—'}</div></div>
-      <div class="app-field"><div class="app-field-label">Year</div><div class="app-field-val">${appData.year || '—'}</div></div>
-      <div class="app-field"><div class="app-field-label">Age</div><div class="app-field-val">${appData.age || '—'}</div></div>
-      <div class="app-field"><div class="app-field-label">Work Experience</div><div class="app-field-val">${appData.work_experience || 'None reported'}</div></div>
+      <div class="app-field"><div class="app-field-label">STEM Field</div><div class="app-field-val">${appData.stem_field || '—'}</div></div>
+      <div class="app-field"><div class="app-field-label">Education</div><div class="app-field-val">${degStr}</div></div>
+      <div class="app-field"><div class="app-field-label">Age / Nationality</div><div class="app-field-val">${appData.age || '—'} · ${appData.nationality || '—'}</div></div>
+      <div class="app-field"><div class="app-field-label">Medical Clearance</div><div class="app-field-val">${appData.medical_clearance || '—'}</div></div>
+      <div class="app-field"><div class="app-field-label">Military Background</div><div class="app-field-val">${appData.military_background ? 'Yes' : 'No'}</div></div>
+      <div class="app-field"><div class="app-field-label">Status</div><div class="app-field-val">${appData.candidate_level || '—'}</div></div>
     </div>`;
 
   const awards = appData.awards && appData.awards.length
@@ -1024,19 +1028,19 @@ function buildAuditPanel(d) {
        <div class="tag-list">${appData.awards.map(a => `<span class="tag">🏆 ${a}</span>`).join('')}</div></div>`
     : '';
 
-  const activities = appData.activities && appData.activities.length
-    ? `<div class="app-field"><div class="app-field-label">Extracurriculars & Activities</div>
-       <div class="tag-list">${appData.activities.map(a => `<span class="tag">${a}</span>`).join('')}</div></div>`
+  const activities = appData.specializations && appData.specializations.length
+    ? `<div class="app-field"><div class="app-field-label">Mission Specializations</div>
+       <div class="tag-list">${appData.specializations.map(a => `<span class="tag">🛸 ${a}</span>`).join('')}</div></div>`
     : '';
 
-  const essay = appData.essay
-    ? `<div class="app-field"><div class="app-field-label">Personal Essay</div>
-       <div class="app-field-val" style="background:var(--white);border:1px solid var(--border);border-radius:7px;padding:12px 14px;line-height:1.7">${appData.essay}</div></div>`
+  const essay = appData.personal_statement
+    ? `<div class="app-field"><div class="app-field-label">Personal Statement</div>
+       <div class="app-field-val" style="background:var(--white);border:1px solid var(--border);border-radius:7px;padding:12px 14px;line-height:1.7">${appData.personal_statement}</div></div>`
     : '';
 
-  const rec = appData.recommendation
-    ? `<div class="app-field"><div class="app-field-label">Recommendation Summary</div>
-       <div class="app-field-val" style="background:#fffdf0;border:1px solid #f0e8c0;border-radius:7px;padding:12px 14px;line-height:1.7;font-style:italic">${appData.recommendation}</div></div>`
+  const rec = appData.psychological_profile
+    ? `<div class="app-field"><div class="app-field-label">Psychological Profile (Evaluator)</div>
+       <div class="app-field-val" style="background:#fffdf0;border:1px solid #f0e8c0;border-radius:7px;padding:12px 14px;line-height:1.7;font-style:italic">${appData.psychological_profile}</div></div>`
     : '';
 
   const appTab = metaGrid + basicInfo + awards + activities + essay + rec;
@@ -1044,10 +1048,10 @@ function buildAuditPanel(d) {
   // ── Tab: Scores & Evidence ────────────────────────────────────
   const scores = `
     <div class="score-bars">
-      ${scoreBar('Academic Achievement', d.rubric.academic)}
-      ${scoreBar('Financial Need',       d.rubric.financial)}
-      ${scoreBar('Leadership & Service', d.rubric.leadership)}
-      ${scoreBar('Essay Quality',        d.rubric.essay)}
+      ${scoreBar('Technical Expertise', d.rubric.academic)}
+      ${scoreBar('Physical \scoreBar('Financial Need',       d.rubric.financial) Medical Fitness', d.rubric.financial)}
+      ${scoreBar('Mission Experience', d.rubric.leadership)}
+      ${scoreBar('Psychological Readiness', d.rubric.essay)}
     </div>
     <div style="margin-top:10px;font-size:11.5px;color:var(--grey);line-height:1.6">${d.reasoning}</div>`;
 
@@ -1055,11 +1059,11 @@ function buildAuditPanel(d) {
     <div style="margin-top:14px">
       <div style="font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;margin-bottom:8px">Extracted Evidence</div>
       <div class="audit-evidence-grid">
-        ${evItem('Academic', d.evidence.academic)}
-        ${evItem('Financial Need', d.evidence.financial)}
-        ${evItem('Leadership', d.evidence.leadership)}
-        ${evItem('Community Impact', d.evidence.community)}
-        ${evItem('Essay Quality', d.evidence.essay)}
+        ${evItem('Technical Expertise', d.evidence.academic)}
+        ${evItem('Physical \evItem('Financial Need', d.evidence.financial) Medical', d.evidence.financial)}
+        ${evItem('Mission Experience', d.evidence.leadership)}
+        ${evItem('Crew Compatibility', d.evidence.community)}
+        ${evItem('Psychological Readiness', d.evidence.essay)}
         ${evItem('Narrative', d.evidence.narrative)}
       </div>
       <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
@@ -1125,41 +1129,41 @@ function buildRubricTab(d, quantWeight) {
   const qlMax = 25 * qualWeight  * 2;   // each qual dim weighted
 
   const dims = [
-    { name:'Academic Achievement', type:'quant', icon:'🔢', score:d.rubric.academic,
+    { name:'Technical Expertise', type:'quant', icon:'🔢', score:d.rubric.academic,
       maxRaw:25, weight:quantWeight,
       criteria:[
-        {band:'22–25', desc:'GPA ≥ 3.8, rigorous coursework, multiple awards or honours'},
-        {band:'17–21', desc:'GPA 3.4–3.79, solid performance, some academic recognition'},
-        {band:'12–16', desc:'GPA 3.0–3.39, average performance, limited recognition'},
-        {band:'7–11',  desc:'GPA 2.5–2.99, below average, improvement trajectory noted'},
-        {band:'0–6',   desc:'GPA < 2.5 with no mitigating context; significant concerns'},
+        {band:'23–25', desc:'2,000+ flight hours across multiple aircraft types, PhD-level STEM credentials'},
+        {band:'18–22', desc:'1,000–2,000 hrs, Master's or PhD, strong engineering or science background'},
+        {band:'12–17', desc:'500–1,000 hrs, Bachelor's/Master's, solid but developing technical profile'},
+        {band:'7–11',  desc:'Under 500 hrs, limited advanced credentials, experience gap noted'},
+        {band:'0–6',   desc:'Minimal flight hours, no advanced degree; significant readiness gap'},
       ]},
-    { name:'Financial Need', type:'quant', icon:'🔢', score:d.rubric.financial,
+    { name:'Physical & Medical Fitness', type:'quant', icon:'🔢', score:d.rubric.financial,
       maxRaw:25, weight:quantWeight,
       criteria:[
-        {band:'22–25', desc:'Household income < $30k, multiple dependents, documented hardship'},
-        {band:'17–21', desc:'Income $30–45k, some dependents, moderate demonstrated need'},
-        {band:'12–16', desc:'Income $45–70k, limited dependents, some financial pressure'},
-        {band:'7–11',  desc:'Income $70–100k, minimal demonstrated financial need'},
-        {band:'0–6',   desc:'Income > $100k, no meaningful financial need documented'},
+        {band:'23–25', desc:'Fitness score 90–100, full medical clearance, exceptional physical baseline'},
+        {band:'18–22', desc:'Fitness 80–89, full clearance, strong physical conditioning'},
+        {band:'12–17', desc:'Fitness 70–79, full or conditional clearance, meets minimum standards'},
+        {band:'7–11',  desc:'Fitness 60–69, conditional clearance, remediation recommended'},
+        {band:'0–6',   desc:'Below 60 fitness or pending clearance; does not meet mission baseline'},
       ]},
-    { name:'Leadership & Service', type:'qual', icon:'📝', score:d.rubric.leadership,
+    { name:'Mission Experience', type:'qual', icon:'📝', score:d.rubric.leadership,
       maxRaw:25, weight:qualWeight,
       criteria:[
-        {band:'22–25', desc:'Founded or led organizations, 150+ documented service hours, measurable community impact'},
-        {band:'17–21', desc:'Named leadership roles in 2+ activities, 100+ hours, some impact documented'},
-        {band:'12–16', desc:'Active participant in activities, some service, limited leadership'},
-        {band:'7–11',  desc:'Minimal extracurricular involvement, few service hours'},
-        {band:'0–6',   desc:'No documented leadership, service, or community engagement'},
+        {band:'22–25', desc:'Prior spaceflight(s), 3+ mission specializations, multiple commendations'},
+        {band:'17–21', desc:'Strong simulation record, 2–3 specializations, relevant operational awards'},
+        {band:'12–16', desc:'1–2 specializations, some relevant experience, no prior missions'},
+        {band:'7–11',  desc:'Limited specializations, early-career operational profile'},
+        {band:'0–6',   desc:'No declared specializations, no relevant operational experience'},
       ]},
-    { name:'Essay Quality', type:'qual', icon:'📝', score:d.rubric.essay,
+    { name:'Psychological Readiness', type:'qual', icon:'📝', score:d.rubric.essay,
       maxRaw:25, weight:qualWeight,
       criteria:[
-        {band:'22–25', desc:'Specific, authentic, compelling narrative — clear purpose, vivid detail, persuasive voice'},
-        {band:'17–21', desc:'Personal and clear with meaningful specificity, believable motivation'},
-        {band:'12–16', desc:'Adequate essay with some personal detail, generally coherent'},
-        {band:'7–11',  desc:'Generic or vague, lacks concrete detail or personal narrative'},
-        {band:'0–6',   desc:'Minimal effort, no personal narrative, template-like or near-empty'},
+        {band:'22–25', desc:'Compelling, self-aware personal statement; prior mission or high-stakes experience; exemplary psych profile'},
+        {band:'17–21', desc:'Clear, specific statement with genuine motivation; solid evaluator profile'},
+        {band:'12–16', desc:'Adequate statement with some depth; generally positive evaluator notes'},
+        {band:'7–11',  desc:'Brief or generic statement; limited evaluator commentary'},
+        {band:'0–6',   desc:'Minimal personal statement, no psychological profile available'},
       ]},
   ];
 

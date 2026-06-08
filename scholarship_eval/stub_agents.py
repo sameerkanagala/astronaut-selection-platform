@@ -8,42 +8,98 @@ from .policy           import ProgramPolicy, PRESETS
 
 class StubAnalysisAgent:
     def extract_evidence(self, app: Application) -> Evidence:
-        gpa_c = ("Exceptional academic record." if app.gpa >= 3.8
-                 else "Solid academic record." if app.gpa >= 3.0
-                 else "Below-average academic record; context required.")
-        need_c = (f"High financial need: ${app.annual_household_income:,}, {app.dependents} dependents."
-                  if app.annual_household_income < 45_000
-                  else f"Moderate financial need: ${app.annual_household_income:,}."
-                  if app.annual_household_income < 90_000
-                  else f"Lower financial need: ${app.annual_household_income:,}.")
-        leadership = (f"Strong leadership: {', '.join(app.extracurriculars[:2])}."
-                      if app.extracurriculars else "No leadership activities reported.")
-        community  = ("Demonstrated community impact." if len(app.extracurriculars) >= 2
-                      else "Limited community engagement.")
-        elen = len(app.essay)
-        essay_c = ("Compelling, specific personal essay." if elen > 500
-                   else "Adequate essay with some detail." if elen > 250
-                   else "Brief, generic essay lacking specificity.")
+        # ── Technical Expertise (Quantitative) ───────────────────────────────────
+        if app.flight_hours >= 2000:
+            tech_c = f"Extensive flight experience: {app.flight_hours:,} hrs. Highly operationally qualified."
+        elif app.flight_hours >= 1000:
+            tech_c = f"Solid flight experience: {app.flight_hours:,} hrs. Meets baseline mission requirements."
+        elif app.flight_hours >= 500:
+            tech_c = f"Developing flight experience: {app.flight_hours:,} hrs. Below preferred threshold."
+        else:
+            tech_c = f"Limited flight hours: {app.flight_hours:,} hrs. Significant gap for mission readiness."
+
+        deg_map = {0: "Bachelor's degree", 1: "Master's degree", 2: "PhD", 3: "Dual PhD"}
+        deg_str = deg_map.get(app.advanced_degrees, f"{app.advanced_degrees} advanced degrees")
+        tech_c += f" {deg_str} in {app.stem_field}."
+
+        # ── Physical & Medical (Quantitative) ────────────────────────────────────
+        if app.physical_fitness_score >= 90:
+            phys_c = f"Exceptional physical fitness: {app.physical_fitness_score:.1f}/100."
+        elif app.physical_fitness_score >= 80:
+            phys_c = f"Strong physical fitness: {app.physical_fitness_score:.1f}/100."
+        elif app.physical_fitness_score >= 70:
+            phys_c = f"Adequate physical fitness: {app.physical_fitness_score:.1f}/100. Improvement recommended."
+        else:
+            phys_c = f"Below-threshold fitness: {app.physical_fitness_score:.1f}/100. Remediation required."
+        phys_c += f" Medical clearance: {app.medical_clearance}."
+
+        # ── Mission Experience (Qualitative) ─────────────────────────────────────
+        if app.prior_missions >= 2:
+            mission_c = f"Veteran astronaut: {app.prior_missions} prior missions."
+        elif app.prior_missions == 1:
+            mission_c = "One prior spaceflight — demonstrated mission readiness."
+        else:
+            mission_c = "No prior spaceflights — candidate class standard."
+
+        if app.specializations:
+            mission_c += f" Specializations: {', '.join(app.specializations)}."
+        else:
+            mission_c += " No declared specializations."
+
+        # ── Crew / Team Compatibility ─────────────────────────────────────────────
+        if app.military_background:
+            crew_c = "Military background — trained in hierarchical crew operations and high-stakes teamwork."
+        else:
+            crew_c = "Civilian background — scientific or engineering team collaboration experience."
+        if len(app.specializations) >= 3:
+            crew_c += " Multi-role capable; strong crew utility."
+
+        # ── Psychological Readiness (Qualitative) ─────────────────────────────────
+        stmt_len = len(app.personal_statement)
+        if stmt_len > 600:
+            psych_c = "Substantive personal statement demonstrating self-awareness and mission clarity."
+        elif stmt_len > 300:
+            psych_c = "Adequate personal statement with relevant context."
+        else:
+            psych_c = "Brief personal statement — limited insight into candidate's motivations."
+        if app.psychological_profile:
+            psych_c += " Evaluator profile available."
+
+        # ── Strengths & Concerns ──────────────────────────────────────────────────
         strengths, concerns = [], []
-        if app.gpa >= 3.7:                    strengths.append(f"Strong GPA ({app.gpa:.2f})")
-        if app.annual_household_income < 45_000: strengths.append("Demonstrated financial need")
-        if len(app.extracurriculars) >= 2:    strengths.append("Active extracurricular engagement")
-        if app.awards:                         strengths.append(f"Recognition: {app.awards[0]}")
-        if elen > 500:                         strengths.append("Articulate personal essay")
-        if app.gpa < 2.8:                      concerns.append("GPA below competitive threshold")
-        if not app.extracurriculars:           concerns.append("No extracurricular activities")
-        if elen < 250:                         concerns.append("Essay lacks depth")
-        if not app.awards:                     concerns.append("No awards documented")
+
+        if app.flight_hours >= 1500:         strengths.append(f"High flight hours ({app.flight_hours:,} hrs)")
+        if app.physical_fitness_score >= 88: strengths.append(f"Excellent fitness score ({app.physical_fitness_score:.0f}/100)")
+        if app.prior_missions >= 1:          strengths.append(f"Prior spaceflight experience ({app.prior_missions} mission(s))")
+        if len(app.specializations) >= 3:    strengths.append(f"Multi-specialization: {', '.join(app.specializations[:2])}...")
+        if app.awards:                       strengths.append(f"Recognised: {app.awards[0]}")
+        if app.advanced_degrees >= 2:        strengths.append(f"Advanced academic credentials ({deg_str})")
+        if app.medical_clearance == "Full":  strengths.append("Full medical clearance")
+        if stmt_len > 600:                   strengths.append("Compelling, specific personal statement")
+
+        if app.flight_hours < 500:           concerns.append(f"Flight hours below mission threshold ({app.flight_hours} hrs)")
+        if app.physical_fitness_score < 75:  concerns.append("Fitness score below recommended baseline")
+        if app.medical_clearance != "Full":  concerns.append(f"Medical clearance: {app.medical_clearance}")
+        if not app.specializations:          concerns.append("No declared mission specializations")
+        if stmt_len < 250:                   concerns.append("Personal statement lacks depth")
+        if app.prior_missions == 0 and app.flight_hours < 800:
+            concerns.append("Limited operational experience for mission assignment")
+
         return Evidence(
             application_id=app.id,
-            academic_strength=gpa_c, financial_need_assessment=need_c,
-            leadership_indicators=leadership, community_impact=community,
-            essay_quality=essay_c,
-            overall_narrative=(f"{app.name} is a {app.year.lower()} studying {app.major}. "
-                               f"{gpa_c} {need_c}"),
-            key_strengths=strengths or ["Application submitted"],
-            key_concerns=concerns  or ["No major concerns identified"],
-            raw_extraction="[stub mode]")
+            academic_strength=tech_c,
+            financial_need_assessment=phys_c,
+            leadership_indicators=mission_c,
+            community_impact=crew_c,
+            essay_quality=psych_c,
+            overall_narrative=(
+                f"{app.name} is a {app.candidate_level} specialising in {app.stem_field}. "
+                f"{tech_c} {phys_c}"
+            ),
+            key_strengths=strengths or ["Application submitted — meets baseline eligibility"],
+            key_concerns=concerns   or ["No major concerns identified"],
+            raw_extraction="[stub mode]",
+        )
 
 
 class StubScoringAgent:
@@ -53,27 +109,44 @@ class StubScoringAgent:
         self.quant_weight   = quant_weight
 
     def score(self, app: Application, evidence: Evidence) -> ScoringResult:
-        # ── Raw dimension scores (0–25 each) ──────────────────────────────────
-        academic  = min(25.0, (app.gpa / 4.0) * 25.0)
-        if   app.annual_household_income <= 30_000: financial = 25.0
-        elif app.annual_household_income <= 50_000: financial = 20.0 + (50_000 - app.annual_household_income) / 20_000 * 5.0
-        elif app.annual_household_income <= 90_000: financial = 12.0 + (90_000 - app.annual_household_income) / 40_000 * 8.0
-        else:                                       financial = max(0.0, 12.0 - (app.annual_household_income - 90_000) / 20_000 * 3.0)
-        financial   = min(25.0, financial + app.dependents * 0.8)
-        leadership  = min(25.0, len(app.extracurriculars) * 5.5 + len(app.awards) * 2.0)
-        essay       = min(25.0, (len(app.essay) / 700) * 20.0 + (3.0 if app.work_experience else 0.0))
+        # ── Dimension 1: Technical Expertise (Quantitative) 0-25 ─────────────────
+        technical = min(22.0, (app.flight_hours / 2500) * 22.0) + min(3.0, app.advanced_degrees * 1.0)
+        technical = min(25.0, technical)
 
-        rubric = RubricScores(round(academic,1), round(financial,1), round(leadership,1), round(essay,1))
+        # ── Dimension 2: Physical & Medical Fitness (Quantitative) 0-25 ──────────
+        physical = (app.physical_fitness_score / 100) * 22.0
+        if app.medical_clearance == "Full":
+            physical += 3.0
+        elif app.medical_clearance == "Conditional":
+            physical -= 3.0
+        physical = min(25.0, max(0.0, physical))
 
-        # ── Apply signal hierarchy weighting ──────────────────────────────────
-        # Quantitative (verifiable): Academic + Financial
-        # Qualitative (unverifiable): Leadership + Essay
-        # Weighted total = quant_pair * quant_weight*2 + qual_pair * qual_weight*2
-        # This preserves 0–100 range while shifting weight toward verified data.
-        qw   = max(0.40, min(0.80, self.quant_weight))
-        qlw  = 1.0 - qw
-        total = ((academic + financial) * qw * 2.0 +
-                 (leadership + essay)   * qlw * 2.0)
+        # ── Dimension 3: Mission Experience (Qualitative) 0-25 ───────────────────
+        mission = min(12.0, len(app.specializations) * 4.0)
+        mission += min(9.0, app.prior_missions * 4.5)
+        mission += min(4.0, len(app.awards) * 1.5)
+        mission = min(25.0, mission)
+
+        # ── Dimension 4: Psychological Readiness (Qualitative) 0-25 ─────────────
+        psych = min(18.0, (len(app.personal_statement) / 650) * 18.0)
+        if app.prior_missions >= 1: psych += 4.0
+        if app.military_background: psych += 2.0
+        psych = min(25.0, psych)
+
+        rubric = RubricScores(
+            round(technical, 1),
+            round(physical, 1),
+            round(mission, 1),
+            round(psych, 1),
+        )
+
+        # ── Apply signal hierarchy weighting ─────────────────────────────────────
+        # Quantitative (verifiable): Technical + Physical
+        # Qualitative  (assessed):   Mission Experience + Psychological
+        qw  = max(0.40, min(0.80, self.quant_weight))
+        qlw = 1.0 - qw
+        total = ((technical + physical) * qw * 2.0 +
+                 (mission   + psych)    * qlw * 2.0)
 
         if   total >= 70: rec = DecisionOutcome.APPROVED
         elif total >= 50: rec = DecisionOutcome.WAITLISTED
@@ -89,29 +162,37 @@ class StubScoringAgent:
         else:                                   conf_level = ConfidenceLevel.LOW
 
         return ScoringResult(
-            application_id=app.id, rubric_scores=rubric, ai_recommendation=rec,
-            confidence=round(confidence, 2), confidence_level=conf_level,
-            reasoning=(f"Total {total:.1f}/100. Academic:{academic:.1f}, Financial:{financial:.1f}, "
-                       f"Leadership:{leadership:.1f}, Essay:{essay:.1f}. "
-                       f"{'Clear approval.' if total>=70 else 'Borderline.' if total>=50 else 'Below threshold.'}"),
-            raw_scoring="[stub mode]")
+            application_id=app.id,
+            rubric_scores=rubric,
+            ai_recommendation=rec,
+            confidence=round(confidence, 2),
+            confidence_level=conf_level,
+            reasoning=(
+                f"Total {total:.1f}/100. "
+                f"Technical:{technical:.1f}, Physical:{physical:.1f}, "
+                f"Mission:{mission:.1f}, Psychological:{psych:.1f}. "
+                f"{'Clear selection.' if total>=70 else 'Borderline — human review warranted.' if total>=50 else 'Below selection threshold.'}"
+            ),
+            raw_scoring="[stub mode]",
+        )
 
 
 class StubOrchestrator:
     def __init__(self, verbose=True, policy: ProgramPolicy = None,
-                 # legacy kwargs kept for backward compat
                  high_threshold=None, low_threshold=None):
-        self.policy = policy or PRESETS["high_volume"]
-        # Allow direct threshold overrides (used by old CLI code)
+        self.policy = policy or PRESETS["initial_screening"]
         if high_threshold is not None: self.policy.confidence_high = high_threshold
         if low_threshold  is not None: self.policy.confidence_low  = low_threshold
 
-        self.analysis_agent    = StubAnalysisAgent()
-        self.scoring_agent     = StubScoringAgent(self.policy.confidence_high, self.policy.confidence_low,
-                                                   getattr(self.policy, 'quant_weight', 0.50))
-        self.signal_evaluator  = SignalEvaluator()
-        self.human_review      = HumanReviewLayer()
-        self.verbose           = verbose
+        self.analysis_agent   = StubAnalysisAgent()
+        self.scoring_agent    = StubScoringAgent(
+            self.policy.confidence_high,
+            self.policy.confidence_low,
+            getattr(self.policy, 'quant_weight', 0.50),
+        )
+        self.signal_evaluator = SignalEvaluator()
+        self.human_review     = HumanReviewLayer()
+        self.verbose          = verbose
 
     def evaluate(self, application: Application) -> Decision:
         audit = []

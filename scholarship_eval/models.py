@@ -1,5 +1,5 @@
 """
-Data models for the Agentic AI Scholarship Evaluation Platform.
+Data models for the Agentic AI Astronaut Candidate Selection Platform.
 """
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any
@@ -40,38 +40,62 @@ class ReviewType(Enum):
 
 @dataclass
 class Application:
-    """Raw scholarship application as submitted by an applicant."""
+    """Raw astronaut candidate application."""
     id: str
     name: str
     age: int
-    gpa: float                         # 0.0–4.0
-    major: str
-    year: str                          # Freshman / Sophomore / Junior / Senior
-    annual_household_income: int       # USD
-    dependents: int
-    essay: str
-    extracurriculars: List[str]
-    work_experience: Optional[str]
-    recommendation_summary: str        # Condensed letter content
-    awards: List[str]
+    nationality: str
+
+    # Background
+    stem_field: str             # e.g. "Aerospace Engineering"
+    candidate_level: str        # e.g. "Group 1 Candidate", "Finalist"
+    military_background: bool
+
+    # Quantitative — Technical Expertise (verifiable)
+    flight_hours: int           # total logged flight hours
+    advanced_degrees: int       # 0 = BSc, 1 = MSc, 2 = PhD, 3 = dual PhD
+
+    # Quantitative — Physical & Medical (verifiable)
+    physical_fitness_score: float   # 0–100 standardised agency score
+    medical_clearance: str          # "Full" | "Conditional" | "Pending"
+
+    # Qualitative — Mission Experience (assessed)
+    specializations: List[str]      # e.g. ["EVA", "Robotics", "Navigation"]
+    prior_missions: int             # previous spaceflights
+    awards: List[str]               # commendations, honours
+
+    # Qualitative — Psychological Readiness (assessed)
+    personal_statement: str         # candidate's own narrative
+    psychological_profile: str      # evaluator narrative summary
 
     def to_text(self) -> str:
         """Render the application as a readable text block for LLM consumption."""
+        med_str  = self.medical_clearance
+        mil_str  = "Yes" if self.military_background else "No"
+        deg_map  = {0: "Bachelor's", 1: "Master's", 2: "PhD", 3: "Dual PhD"}
+        deg_str  = deg_map.get(self.advanced_degrees, f"{self.advanced_degrees} advanced degrees")
         return f"""
-SCHOLARSHIP APPLICATION — {self.id}
-====================================
-Applicant      : {self.name}, Age {self.age}
-Academic       : {self.major}, {self.year}, GPA {self.gpa:.2f}
-Financial      : Annual household income ${self.annual_household_income:,}, {self.dependents} dependents
-Work Experience: {self.work_experience or 'None reported'}
-Awards         : {', '.join(self.awards) if self.awards else 'None'}
-Extracurriculars: {', '.join(self.extracurriculars) if self.extracurriculars else 'None'}
+ASTRONAUT CANDIDATE APPLICATION — {self.id}
+===========================================
+Candidate      : {self.name}, Age {self.age}, {self.nationality}
+Background     : {self.stem_field}, {deg_str}, Military: {mil_str}
+Status         : {self.candidate_level}
 
-PERSONAL ESSAY:
-{self.essay}
+QUANTITATIVE DATA (Verifiable):
+  Flight Hours         : {self.flight_hours:,} hrs
+  Physical Fitness     : {self.physical_fitness_score:.1f}/100
+  Medical Clearance    : {med_str}
 
-RECOMMENDATION SUMMARY:
-{self.recommendation_summary}
+MISSION EXPERIENCE:
+  Prior Missions       : {self.prior_missions}
+  Specializations      : {', '.join(self.specializations) if self.specializations else 'None listed'}
+  Awards & Honours     : {', '.join(self.awards) if self.awards else 'None'}
+
+PSYCHOLOGICAL PROFILE (Evaluator Summary):
+{self.psychological_profile}
+
+PERSONAL STATEMENT:
+{self.personal_statement}
 """.strip()
 
 
@@ -83,15 +107,15 @@ RECOMMENDATION SUMMARY:
 class Evidence:
     """Structured evidence extracted by the Analysis Agent."""
     application_id: str
-    academic_strength: str
-    financial_need_assessment: str
-    leadership_indicators: str
-    community_impact: str
-    essay_quality: str
+    academic_strength: str          # technical expertise summary
+    financial_need_assessment: str  # physical & medical summary
+    leadership_indicators: str      # mission experience summary
+    community_impact: str           # crew / team compatibility
+    essay_quality: str              # psychological readiness summary
     overall_narrative: str
     key_strengths: List[str]
     key_concerns: List[str]
-    raw_extraction: str                # Full LLM response for audit
+    raw_extraction: str             # Full LLM response for audit
 
 
 # ─────────────────────────────────────────────
@@ -101,10 +125,10 @@ class Evidence:
 @dataclass
 class RubricScores:
     """Rubric-based scores (each dimension 0–25, total 0–100)."""
-    academic_achievement: float
-    financial_need: float
-    leadership_service: float
-    essay_quality: float
+    academic_achievement: float     # Technical Expertise
+    financial_need: float           # Physical & Medical Fitness
+    leadership_service: float       # Mission Experience
+    essay_quality: float            # Psychological Readiness
 
     @property
     def total(self) -> float:
@@ -118,10 +142,10 @@ class RubricScores:
     def to_dict(self) -> Dict[str, float]:
         return {
             "academic_achievement": round(self.academic_achievement, 1),
-            "financial_need": round(self.financial_need, 1),
-            "leadership_service": round(self.leadership_service, 1),
-            "essay_quality": round(self.essay_quality, 1),
-            "total": round(self.total, 1),
+            "financial_need":       round(self.financial_need, 1),
+            "leadership_service":   round(self.leadership_service, 1),
+            "essay_quality":        round(self.essay_quality, 1),
+            "total":                round(self.total, 1),
         }
 
 
@@ -131,10 +155,10 @@ class ScoringResult:
     application_id: str
     rubric_scores: RubricScores
     ai_recommendation: DecisionOutcome
-    confidence: float                  # 0.0–1.0
+    confidence: float               # 0.0–1.0
     confidence_level: ConfidenceLevel
     reasoning: str
-    raw_scoring: str                   # Full LLM response for audit
+    raw_scoring: str                # Full LLM response for audit
 
 
 # ─────────────────────────────────────────────
@@ -147,7 +171,7 @@ class HumanReview:
     reviewer_id: str
     reviewer_name: str
     outcome: DecisionOutcome
-    score_adjustment: float            # Delta applied to AI total score
+    score_adjustment: float         # Delta applied to AI total score
     notes: str
     override_reason: Optional[str] = None  # Set if outcome differs from AI rec
 

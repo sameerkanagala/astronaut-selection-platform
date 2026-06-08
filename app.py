@@ -1,5 +1,5 @@
 """
-Scholarship Evaluation Platform — Flask Web Application
+Astronaut Candidate Selection Platform — Flask Web Application
 Uses a background-thread + polling architecture for reliable delivery
 on any proxy/CDN (Railway, Heroku, etc.) without SSE buffering issues.
 
@@ -202,11 +202,17 @@ def health():
 @app.route("/api/applications")
 def list_applications():
     return jsonify([
-        {"id": a.id, "name": a.name, "age": a.age, "gpa": a.gpa,
-         "major": a.major, "year": a.year, "income": a.annual_household_income,
-         "dependents": a.dependents, "awards": a.awards,
-         "activities": a.extracurriculars, "work_experience": a.work_experience,
-         "essay": a.essay, "recommendation": a.recommendation_summary}
+        {"id": a.id, "name": a.name, "age": a.age,
+         "nationality": a.nationality,
+         "stem_field": a.stem_field, "candidate_level": a.candidate_level,
+         "military_background": a.military_background,
+         "flight_hours": a.flight_hours, "advanced_degrees": a.advanced_degrees,
+         "physical_fitness_score": a.physical_fitness_score,
+         "medical_clearance": a.medical_clearance,
+         "specializations": a.specializations, "prior_missions": a.prior_missions,
+         "awards": a.awards,
+         "personal_statement": a.personal_statement,
+         "psychological_profile": a.psychological_profile}
         for a in APPLICATIONS
     ])
 
@@ -227,7 +233,7 @@ def evaluate():
 
     # Build policy
     policy_data = body.get("policy", {})
-    preset_key  = policy_data.get("program_type", "high_volume")
+    preset_key  = policy_data.get("program_type", "initial_screening")
     import copy
     if preset_key in PRESETS:
         policy = copy.deepcopy(PRESETS[preset_key])
