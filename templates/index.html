@@ -1004,7 +1004,7 @@ function buildAuditPanel(d) {
   const uid = d.app_id.replace('-','');
 
   // ── Tab: Application ──────────────────────────────────────────
-  const degLabels = ['Bachelor\'s', 'Master\'s', 'PhD', 'Dual PhD'];
+  const degLabels = ["Bachelor's", "Master's", "PhD", "Dual PhD"];
   const degStr = degLabels[appData.advanced_degrees] || (appData.advanced_degrees + ' degrees');
   const metaGrid = `
     <div class="app-meta-grid">
@@ -1049,7 +1049,7 @@ function buildAuditPanel(d) {
   const scores = `
     <div class="score-bars">
       ${scoreBar('Technical Expertise', d.rubric.academic)}
-      ${scoreBar('Physical \scoreBar('Financial Need',       d.rubric.financial) Medical Fitness', d.rubric.financial)}
+      ${scoreBar('Physical & Medical Fitness', d.rubric.financial)}
       ${scoreBar('Mission Experience', d.rubric.leadership)}
       ${scoreBar('Psychological Readiness', d.rubric.essay)}
     </div>
@@ -1060,7 +1060,7 @@ function buildAuditPanel(d) {
       <div style="font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;margin-bottom:8px">Extracted Evidence</div>
       <div class="audit-evidence-grid">
         ${evItem('Technical Expertise', d.evidence.academic)}
-        ${evItem('Physical \evItem('Financial Need', d.evidence.financial) Medical', d.evidence.financial)}
+        ${evItem('Physical & Medical Fitness', d.evidence.financial)}
         ${evItem('Mission Experience', d.evidence.leadership)}
         ${evItem('Crew Compatibility', d.evidence.community)}
         ${evItem('Psychological Readiness', d.evidence.essay)}
