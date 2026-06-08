@@ -105,15 +105,18 @@ class ScoringAgent:
 
     @staticmethod
     def _format_evidence(app, ev):
-        return (f"APPLICANT: {app.name} ({app.id})\n"
-                f"GPA: {app.gpa:.2f} | Major: {app.major} | Year: {app.year}\n"
-                f"Household Income: ${app.annual_household_income:,} | Dependents: {app.dependents}\n\n"
+        deg_map = {0: "Bachelor's", 1: "Master's", 2: "PhD", 3: "Dual PhD"}
+        deg_str = deg_map.get(app.advanced_degrees, f"{app.advanced_degrees} advanced degrees")
+        return (f"CANDIDATE: {app.name} ({app.id})\n"
+                f"Field: {app.stem_field} | {deg_str} | Military: {'Yes' if app.military_background else 'No'}\n"
+                f"Flight Hours: {app.flight_hours:,} | Fitness: {app.physical_fitness_score:.1f}/100 | Medical: {app.medical_clearance}\n"
+                f"Prior Missions: {app.prior_missions} | Specializations: {', '.join(app.specializations) or 'None'}\n\n"
                 f"EXTRACTED EVIDENCE:\n"
-                f"Academic Strength     : {ev.academic_strength}\n"
-                f"Financial Need        : {ev.financial_need_assessment}\n"
-                f"Leadership Indicators : {ev.leadership_indicators}\n"
-                f"Community Impact      : {ev.community_impact}\n"
-                f"Essay Quality         : {ev.essay_quality}\n"
+                f"Technical Expertise   : {ev.academic_strength}\n"
+                f"Physical & Medical    : {ev.financial_need_assessment}\n"
+                f"Mission Experience    : {ev.leadership_indicators}\n"
+                f"Crew Compatibility    : {ev.community_impact}\n"
+                f"Psychological Profile : {ev.essay_quality}\n"
                 f"Overall Narrative     : {ev.overall_narrative}\n"
                 f"Key Strengths : {', '.join(ev.key_strengths)}\n"
                 f"Key Concerns  : {', '.join(ev.key_concerns) if ev.key_concerns else 'None'}")

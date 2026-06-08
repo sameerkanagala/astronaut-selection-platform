@@ -1,12 +1,12 @@
 """
 Human Review Layer
 ==================
-Simulates human scholarship reviewers with policy-aware behaviour.
+Simulates human selection board reviewers with policy-aware behaviour.
 
 Key design: the active ProgramPolicy influences reviewer strictness.
-  - high_volume  → reviewers lean generous, approve-threshold lower
-  - high_dollar  → reviewers are balanced, apply higher scrutiny
-  - regulatory   → reviewers are strict, approval threshold is highest
+  - initial_screening → reviewers lean generous, approve-threshold lower
+  - mission_assignment → reviewers are balanced, apply higher scrutiny
+  - deep_space        → reviewers are strict, approval threshold is highest
   - escalation / senior_adjudication → reviewer pool shifts toward strict/balanced
 
 This means changing the preset or sliders produces meaningfully different
@@ -29,10 +29,14 @@ _REVIEWERS = [
 # Higher approve_threshold = harder to get approved
 # Higher noise = more variance in reviewer decisions
 _POLICY_PARAMS = {
+    "initial_screening": {"approve": 65.0, "waitlist": 48.0, "noise": 2.5, "strict_weight": 0.10},
+    "mission_assignment": {"approve": 70.0, "waitlist": 52.0, "noise": 2.0, "strict_weight": 0.35},
+    "deep_space":        {"approve": 74.0, "waitlist": 56.0, "noise": 1.5, "strict_weight": 0.55},
+    "custom":            {"approve": 68.0, "waitlist": 50.0, "noise": 2.5, "strict_weight": 0.20},
+    # Legacy aliases
     "high_volume": {"approve": 65.0, "waitlist": 48.0, "noise": 2.5, "strict_weight": 0.10},
     "high_dollar": {"approve": 70.0, "waitlist": 52.0, "noise": 2.0, "strict_weight": 0.35},
     "regulatory":  {"approve": 74.0, "waitlist": 56.0, "noise": 1.5, "strict_weight": 0.55},
-    "custom":      {"approve": 68.0, "waitlist": 50.0, "noise": 2.5, "strict_weight": 0.20},
 }
 
 # Escalation/senior cases use stricter reviewers regardless of policy
@@ -123,23 +127,30 @@ class HumanReviewLayer:
 
     def _contextual_adjustment(self, app: Application, style: str, program_type: str) -> float:
         delta = 0.0
-        if app.age >= 25:
-            delta += 3.0 if style in ("holistic", "equity-focused") else 0.5
-        if app.annual_household_income < 40_000:
-            delta += 2.5 if style == "equity-focused" else 1.0
-        if app.dependents >= 3:
-            delta += 1.5
-        if app.gpa < 2.6:
-            delta -= 5.0 if style == "strict" else 2.0
-        if app.gpa >= 3.8 and style == "merit-focused":
+        # Prior mission experience — strong positive signal
+        if app.prior_missions >= 1:
+            delta += 3.0 if style in ("holistic", "merit-focused") else 1.5
+        if app.prior_missions >= 2:
             delta += 2.0
-        if len(app.essay) < 300:
+        # Military background — valued by strict/merit-focused reviewers
+        if app.military_background:
+            delta += 1.5 if style in ("strict", "merit-focused") else 0.5
+        # Low flight hours — negative signal, especially for strict reviewers
+        if app.flight_hours < 500:
+            delta -= 4.0 if style == "strict" else 2.0
+        elif app.flight_hours >= 2000 and style == "merit-focused":
+            delta += 2.0
+        # Short personal statement — penalised by holistic/equity reviewers
+        if len(app.personal_statement) < 300:
             delta -= 3.5
-        # Regulatory/high-dollar programs penalise weaker profiles more
-        if program_type in ("regulatory", "high_dollar"):
-            if app.gpa < 3.0:      delta -= 2.0
-            if not app.awards:     delta -= 1.0
-            if not app.extracurriculars: delta -= 1.5
+        # Conditional clearance — significant concern for mission-critical programs
+        if app.medical_clearance == "Conditional":
+            delta -= 2.0 if style != "holistic" else -0.5
+        # Deep-space / mission-assignment programs penalise weaker profiles more
+        if program_type in ("deep_space", "mission_assignment", "regulatory", "high_dollar"):
+            if app.flight_hours < 1000:  delta -= 2.0
+            if not app.awards:           delta -= 1.0
+            if not app.specializations:  delta -= 1.5
         return delta
 
     # ── Text helpers ──────────────────────────────────────────────────────────
@@ -149,15 +160,17 @@ class HumanReviewLayer:
         delta = adjusted - scoring.rubric_scores.total
         direction = "upward" if delta >= 0 else "downward"
         style_comment = {
-            "holistic":      f"Weighted {app.name}'s full context and trajectory.",
-            "strict":        f"Applied rubric strictly; {app.name}'s record must stand on its merits.",
-            "balanced":      f"Considered both scores and qualitative context.",
-            "merit-focused": f"Academic and leadership achievement weighted heavily.",
-            "equity-focused":f"Applied an equity lens for structural barriers {app.name} may have faced.",
+            "holistic":      f"Weighted {app.name}'s full context, trajectory, and mission readiness.",
+            "strict":        f"Applied rubric strictly; {app.name}'s record must stand on its operational merits.",
+            "balanced":      f"Considered both quantitative scores and qualitative mission context.",
+            "merit-focused": f"Flight hours, technical credentials, and mission experience weighted heavily.",
+            "equity-focused":f"Considered the full candidate profile including non-traditional pathways.",
         }.get(reviewer["style"], "")
         policy_note = {
-            "regulatory":  " Regulatory program — elevated approval bar applied.",
-            "high_dollar": " High-value award — additional scrutiny applied.",
+            "deep_space":        " Deep-space programme — elevated approval bar applied.",
+            "mission_assignment":" Mission assignment — additional operational scrutiny applied.",
+            "regulatory":        " Regulatory programme — elevated approval bar applied.",
+            "high_dollar":       " High-stakes assignment — additional scrutiny applied.",
         }.get(program_type, "")
         return (f"AI score: {scoring.rubric_scores.total:.1f}/100. "
                 f"My adjusted score: {adjusted:.1f}/100 ({direction} {abs(delta):.1f} pts). "
