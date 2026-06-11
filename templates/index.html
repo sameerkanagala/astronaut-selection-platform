@@ -130,10 +130,10 @@
     /* ── Empty state ──────────────────────────────────────────── */
     .empty-state {
       display: flex; flex-direction: column; align-items: center;
-      justify-content: center; height: 60%; gap: 12px; color: #aaa;
+      justify-content: center; padding: 48px 24px; gap: 12px; color: #aaa;
     }
     .empty-state svg { opacity: .3; }
-    .empty-state p { font-size: 14px; }
+    .empty-state p { font-size: 14px; text-align: center; }
 
     /* ── Progress feed ────────────────────────────────────────── */
     .progress-section { margin-bottom: 20px; }
@@ -320,10 +320,28 @@
     .section-wrap { background: var(--white); border: 1px solid var(--border);
                     border-radius: 10px; padding: 16px 18px; margin-bottom: 20px; }
 
+    /* Mobile scroll hint */
+    .scroll-hint {
+      display: none;
+      position: sticky; bottom: 0;
+      background: linear-gradient(transparent, rgba(26,55,94,.95));
+      text-align: center; padding: 10px 0 8px;
+      font-size: 11px; font-weight: 600; color: #8aabcc;
+      letter-spacing: .04em; pointer-events: none;
+    }
+    .scroll-hint span { animation: bounceDown .9s infinite; display: inline-block; }
+    @keyframes bounceDown {
+      0%,100% { transform: translateY(0); }
+      50%      { transform: translateY(4px); }
+    }
+
     /* Responsive */
     @media (max-width: 768px) {
-      .layout { flex-direction: column; }
-      .sidebar { width: 100%; min-width: unset; max-height: 45vh; }
+      .layout { flex-direction: column; height: auto; overflow: visible; }
+      .sidebar { width: 100%; min-width: unset; max-height: 55vh; overflow-y: auto; }
+      .main { min-height: 50vh; overflow: visible; }
+      .content { overflow: visible; }
+      .scroll-hint { display: block; }
       .cal-grid { grid-template-columns: 1fr; }
       .audit-evidence-grid { grid-template-columns: 1fr; }
     }
@@ -570,6 +588,7 @@
       </div>
 
     </div><!-- /sidebar-body -->
+    <div class="scroll-hint" id="scroll-hint"><span>▾</span> Scroll for candidates &amp; Run</div>
   </aside>
 
   <!-- ══ MAIN ═════════════════════════════════════════════════ -->
@@ -660,6 +679,18 @@ let awardSensitivity = 'low';
 document.addEventListener('DOMContentLoaded', () => {
   fetch('/api/applications').then(r=>r.json()).then(apps => { allApps=apps; renderAppList(apps); });
   fetch('/api/presets').then(r=>r.json()).then(p => { presets=p; });
+
+  // Mobile: collapse all accordions so candidates + Run button are immediately visible
+  if (window.innerWidth <= 768) {
+    document.querySelectorAll('.acc.open').forEach(a => a.classList.remove('open'));
+  }
+
+  // Hide scroll hint once user scrolls the sidebar
+  const sidebar = document.querySelector('.sidebar');
+  const hint    = document.getElementById('scroll-hint');
+  if (sidebar && hint) {
+    sidebar.addEventListener('scroll', () => { hint.style.opacity = '0'; hint.style.pointerEvents = 'none'; }, { once: true });
+  }
 });
 
 function renderAppList(apps) {
