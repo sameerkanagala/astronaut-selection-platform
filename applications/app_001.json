@@ -1,0 +1,18 @@
+{
+  "id": "IEA-001",
+  "name": "Dr. Sarah Chen",
+  "age": 37,
+  "nationality": "American",
+  "stem_field": "Aerospace Engineering",
+  "candidate_level": "Group 7 Finalist",
+  "military_background": true,
+  "flight_hours": 2450,
+  "advanced_degrees": 2,
+  "physical_fitness_score": 94.0,
+  "medical_clearance": "Full",
+  "specializations": ["EVA Operations", "Propulsion Systems", "Navigation"],
+  "prior_missions": 1,
+  "awards": ["Distinguished Flying Cross", "NASA Group Achievement Award"],
+  "personal_statement": "After twelve years as a test pilot and two as a flight instructor, I applied to the IEA because I believe the next chapter of human exploration demands people who can operate at the intersection of engineering precision and adaptive decision-making under uncertainty. My doctoral research on cryogenic fuel systems directly supports long-duration mission architecture. I thrive in high-stakes, time-compressed environments — not despite the pressure, but because clear thinking under pressure is a skill I have spent a career deliberately building. I am ready for this mission.",
+  "psychological_profile": "Candidate demonstrates exceptional stress tolerance and disciplined problem decomposition. Group simulation performance ranked in the top 5% of cohort. Strong situational awareness. Collaborative leadership style; observed de-escalating crew tension effectively in scenario 4."
+}

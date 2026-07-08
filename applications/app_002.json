@@ -1,0 +1,18 @@
+{
+  "id": "IEA-002",
+  "name": "Marcus Webb",
+  "age": 34,
+  "nationality": "British",
+  "stem_field": "Geology & Planetary Science",
+  "candidate_level": "Group 7 Candidate",
+  "military_background": false,
+  "flight_hours": 820,
+  "advanced_degrees": 2,
+  "physical_fitness_score": 78.5,
+  "medical_clearance": "Full",
+  "specializations": ["Sample Collection", "Remote Sensing"],
+  "prior_missions": 0,
+  "awards": ["Royal Geographical Society Research Prize"],
+  "personal_statement": "My fieldwork in volcanic rift zones and sub-Arctic permafrost has given me experience that translates directly to planetary surface operations. I understand isolation, equipment failure, and working in hostile environments with limited resupply. I am a scientist who learned to fly because I wanted to go where the best samples are. Space is where the best samples are.",
+  "psychological_profile": "Candidate is intellectually driven and highly motivated. Performs well on independent tasks. Some hesitation observed in collaborative pressure scenarios — recommends additional crew resource management training before mission assignment."
+}

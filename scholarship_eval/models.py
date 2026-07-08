@@ -203,6 +203,8 @@ class Decision:
     agreed:          Optional[bool]       # None when AI-only
     audit_trail:     List[AuditStep]
     signals:         Optional[Any] = None # SignalEvaluation (imported lazily to avoid circular)
+    redacted_application: Optional[Any] = None  # RedactedApplication - what the LLM stages actually saw
+    redaction_report:     Optional[Any] = None  # RedactionReport - entities masked/blocked, for display
     decided_at:      str = field(
         default_factory=lambda: datetime.datetime.utcnow().isoformat()
     )

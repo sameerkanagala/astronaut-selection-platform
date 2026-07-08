@@ -19,6 +19,7 @@ class Orchestrator:
         self,
         client:  Anthropic,
         model:   str          = "claude-haiku-4-5-20251001",
+        redactor              = None,   # PIIRedactor, injected by app.py's live-mode builder
         policy:  ProgramPolicy = None,
         verbose: bool          = True,
     ):
@@ -31,15 +32,35 @@ class Orchestrator:
         )
         self.signal_evaluator   = SignalEvaluator()
         self.human_review_layer = HumanReviewLayer()
+        self.redactor            = redactor
         self.verbose            = verbose
 
     def evaluate(self, application: Application) -> Decision:
         audit = []
         self._log(f"\n{'═'*55}\n  {application.id} — {application.name}\n{'═'*55}")
 
+        # Stage 0: PII redaction (Bedrock Guardrails) — de-identifies the
+        # candidate before any LLM or simulated reviewer ever sees it.
+        # Every stage below operates on `redacted`, not `application`.
+        redaction_report = None
+        if self.redactor is not None:
+            self._log("  [0/5] PII Redaction (Bedrock Guardrails) …")
+            redacted, redaction_report = self.redactor.redact(application)
+            entity_counts = redaction_report.entity_counts()
+            blocked = redaction_report.blocked_fields()
+            audit.append(AuditStep(
+                step="0_pii_redaction", agent="PIIRedactor",
+                summary=(f"De-identified before any LLM call. Entities masked: "
+                         f"{entity_counts or 'none detected'}."
+                         + (f" Blocked fields: {blocked}." if blocked else "")),
+                metadata={"entity_counts": entity_counts, "blocked_fields": blocked,
+                          "guardrail_intervened": redaction_report.guardrail_intervened}))
+        else:
+            redacted = application
+
         # Stage 1: Evidence extraction
         self._log("  [1/5] Analysis Agent …")
-        evidence = self.analysis_agent.extract_evidence(application)
+        evidence = self.analysis_agent.extract_evidence(redacted)
         audit.append(AuditStep(step="1_evidence_extraction", agent="AnalysisAgent",
                                summary=evidence.overall_narrative,
                                metadata={"strengths": evidence.key_strengths,
@@ -47,7 +68,7 @@ class Orchestrator:
 
         # Stage 2: Rubric scoring
         self._log("  [2/5] Scoring Agent …")
-        scoring = self.scoring_agent.score(application, evidence)
+        scoring = self.scoring_agent.score(redacted, evidence)
         audit.append(AuditStep(step="2_rubric_scoring", agent="ScoringAgent",
                                summary=f"Total {scoring.rubric_scores.total:.1f}/100 | "
                                        f"{scoring.ai_recommendation.value} | conf={scoring.confidence:.2f}",
@@ -89,7 +110,9 @@ class Orchestrator:
 
         if needs_human:
             self._log("  [5/5] Human Review …")
-            human_review  = self.human_review_layer.review(application, scoring, review_type, self.policy)
+            # Human review also operates on the de-identified view when
+            # redaction is active — blind review, same as the LLM stages.
+            human_review  = self.human_review_layer.review(redacted, scoring, review_type, self.policy)
             agreed        = human_review.outcome == scoring.ai_recommendation
             final_outcome = human_review.outcome
             audit.append(AuditStep(step="5_human_review",
@@ -118,6 +141,8 @@ class Orchestrator:
             agreed=agreed,
             audit_trail=audit,
             signals=signals,
+            redacted_application=redacted if self.redactor is not None else None,
+            redaction_report=redaction_report,
         )
 
     def _log(self, msg):

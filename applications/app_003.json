@@ -1,0 +1,18 @@
+{
+  "id": "IEA-003",
+  "name": "Dr. Elena Vasquez",
+  "age": 41,
+  "nationality": "Mexican",
+  "stem_field": "Emergency Medicine & Human Physiology",
+  "candidate_level": "Group 7 Candidate",
+  "military_background": false,
+  "flight_hours": 310,
+  "advanced_degrees": 2,
+  "physical_fitness_score": 81.0,
+  "medical_clearance": "Full",
+  "specializations": ["Medical Operations", "Life Support Systems"],
+  "prior_missions": 0,
+  "awards": ["WHO Global Health Leadership Award", "Medecins Sans Frontieres Service Medal"],
+  "personal_statement": "I have performed surgery in a field hospital during a category 5 hurricane and managed a disease outbreak in a remote mountain community with no external communication for 11 days. The physical and psychological demands of space medicine are not abstractions to me — they are engineering problems I have been solving under pressure my entire career. I bring skills no amount of simulation can replicate. I also intend to get my flight hours up.",
+  "psychological_profile": "Outstanding composure under ambiguity. Demonstrates rare ability to communicate calm confidence to a team while managing complex parallel tasks. Essay quality high — coherent, specific, and honest about limitations. Strong crew medicine candidate."
+}

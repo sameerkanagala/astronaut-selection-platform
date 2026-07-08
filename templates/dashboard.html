@@ -1,0 +1,1378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Evaluation Dashboards — Astronaut Candidate Selection Platform</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#1e2b3c;--navy2:#162030;--teal:#0097b2;--teal-h:#007d96;--teal-bg:#e6f6f9;
+  --white:#fff;--lgrey:#f5f6f8;--border:#e2e6ea;--text:#2d3748;--sub:#718096;
+  --green:#1d7a4e;--green-bg:#e8f5e9;
+  --amber:#a05c00;--amber-bg:#fff4e0;
+  --red:#b52b2b;--red-bg:#fdecea;
+  --blue:#3949ab;--blue-bg:#eef0fb;
+  --purple:#6b3fa0;--purple-bg:#f0ebfa;
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+}
+html,body{height:100%;font-family:var(--font);background:var(--lgrey);color:var(--text);font-size:14px}
+
+/* ── Top bar ── */
+.topbar{background:var(--navy2);height:52px;display:flex;align-items:center;
+  padding:0 20px;gap:12px;position:sticky;top:0;z-index:200}
+.topbar-title{font-size:14px;font-weight:600;color:#fff;flex:none;margin-right:4px}
+.topbar a{color:rgba(255,255,255,.5);font-size:12px;text-decoration:none;cursor:pointer;white-space:nowrap}
+.topbar a:hover{color:#fff}
+select.preset-sel{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);
+  color:#fff;border-radius:5px;padding:4px 8px;font-size:12px;cursor:pointer;outline:none}
+select.preset-sel option{background:#1e2b3c}
+.mode-toggle{display:flex;background:rgba(255,255,255,.08);border-radius:5px;overflow:hidden}
+.mode-btn{padding:4px 10px;font-size:12px;cursor:pointer;color:rgba(255,255,255,.6);
+  border:none;background:transparent;transition:all .15s}
+.mode-btn.active{background:var(--teal);color:#fff}
+.run-btn{padding:6px 16px;background:var(--teal);border:none;color:#fff;border-radius:5px;
+  font-size:12px;font-weight:600;cursor:pointer;min-width:110px;transition:background .15s}
+.run-btn:hover:not(:disabled){background:var(--teal-h)}
+.run-btn:disabled{opacity:.6;cursor:not-allowed}
+.run-btn.running{background:#4a5568}
+.progress-bar-wrap{height:2px;background:rgba(0,0,0,.1)}
+.progress-bar{height:2px;background:var(--teal);width:0%;transition:width .3s}
+
+/* ── Tab nav ── */
+.tab-nav{background:var(--white);border-bottom:1px solid var(--border);
+  display:flex;padding:0 20px;position:sticky;top:52px;z-index:100}
+.tab-btn{padding:11px 16px;font-size:13px;color:var(--sub);cursor:pointer;
+  border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap;
+  display:flex;align-items:center;gap:6px}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{color:var(--teal);border-bottom-color:var(--teal);font-weight:600}
+.tab-count{font-size:10px;background:var(--lgrey);color:var(--sub);
+  border-radius:8px;padding:1px 5px;font-weight:600}
+.tab-btn.active .tab-count{background:var(--teal-bg);color:var(--teal)}
+
+/* ── Page ── */
+.page{max-width:1280px;margin:0 auto;padding:18px 20px 40px}
+.tab-panel{display:none}.tab-panel.active{display:block}
+
+/* ── Status strip ── */
+.status-strip{border-radius:7px;padding:7px 12px;font-size:12px;
+  margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.status-strip.running{background:var(--teal-bg);border:1px solid #b2e4ed;color:#0a6678}
+.status-strip.done{background:var(--green-bg);border:1px solid #a0d8b8;color:var(--green)}
+.status-strip.error{background:var(--red-bg);border:1px solid #f0a0a0;color:var(--red)}
+.spin{display:inline-block;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Section label ── */
+.sec{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;
+  color:var(--sub);margin:0 0 8px}
+
+/* ── KPI grid ── */
+.kpi-row{display:grid;gap:10px;margin-bottom:16px}
+.kpi-row-4{grid-template-columns:repeat(4,1fr)}
+.kpi-row-5{grid-template-columns:repeat(5,1fr)}
+.kpi{background:var(--white);border:0.5px solid var(--border);border-radius:9px;
+  padding:12px 14px;cursor:pointer;transition:border-color .15s}
+.kpi:hover{border-color:var(--teal)}
+.kpi.active{border-color:var(--teal);box-shadow:0 0 0 2px var(--teal-bg)}
+.kpi-lbl{font-size:11px;color:var(--sub);margin-bottom:5px}
+.kpi-val{font-size:24px;font-weight:700;color:var(--text);line-height:1.1}
+.kpi-sub{font-size:11px;color:var(--sub);margin-top:2px}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:3px}
+
+/* ── Chart cards ── */
+.chart-grid-3{display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:14px;margin-bottom:14px}
+.chart-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.chart-grid-2r{display:grid;grid-template-columns:1.2fr 1fr;gap:14px;margin-bottom:14px}
+.chart-grid-1{margin-bottom:14px}
+.cc{background:var(--white);border:0.5px solid var(--border);border-radius:9px;padding:14px 16px}
+.cc-title{font-size:12px;font-weight:600;color:var(--text);margin-bottom:10px;
+  display:flex;align-items:center;justify-content:space-between}
+.cc-badge{font-size:10px;background:var(--lgrey);color:var(--sub);border-radius:6px;padding:2px 6px}
+
+/* ── Funnel visual ── */
+.funnel-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 0}
+.funnel-step{width:100%;position:relative;display:flex;flex-direction:column;align-items:center}
+.funnel-bar{height:36px;border-radius:4px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 10px;font-size:11px;font-weight:600;color:#fff;cursor:pointer;min-width:60px}
+.funnel-bar:hover{filter:brightness(1.08)}
+.funnel-arrow{font-size:12px;color:var(--border);line-height:1}
+.funnel-pct{position:absolute;right:-42px;top:50%;transform:translateY(-50%);
+  font-size:10px;color:var(--sub);white-space:nowrap}
+
+/* ── Legend ── */
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;font-size:11px;color:var(--sub)}
+.li{display:flex;align-items:center;gap:3px}
+.ls{width:9px;height:9px;border-radius:2px;flex-shrink:0}
+
+/* ── Drilldown ── */
+.drilldown{background:var(--white);border:0.5px solid var(--border);border-radius:9px;
+  margin-top:14px;overflow:hidden}
+.drill-hdr{padding:10px 16px;border-bottom:0.5px solid var(--border);background:#fafbfc;
+  display:flex;align-items:center;justify-content:space-between}
+.drill-title{font-size:13px;font-weight:600}
+.drill-close{background:none;border:none;cursor:pointer;color:var(--sub);font-size:16px;padding:2px 4px}
+table.dt{width:100%;border-collapse:collapse;font-size:13px}
+table.dt th{padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.04em;color:var(--sub);border-bottom:2px solid var(--border);background:#fafbfc;
+  cursor:pointer;white-space:nowrap}
+table.dt th:hover{color:var(--text)}
+table.dt td{padding:8px 12px;border-bottom:0.5px solid var(--border);vertical-align:middle}
+table.dt tr:last-child td{border-bottom:none}
+table.dt tr:hover td{background:var(--lgrey)}
+table.dt tr.exp td{background:var(--teal-bg)}
+.xrow td{background:var(--lgrey)!important;padding:10px 12px}
+.xgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px}
+.xcard{background:var(--white);border:0.5px solid var(--border);border-radius:6px;
+  padding:8px 10px;text-align:center}
+.xcard .v{font-size:15px;font-weight:700}
+.xcard .l{font-size:10px;color:var(--sub);margin-top:2px}
+.xbar-wrap{background:var(--border);border-radius:2px;height:4px;margin-top:5px;overflow:hidden}
+.xbar{height:100%;border-radius:2px;background:var(--teal)}
+
+/* ── Badges ── */
+.badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:9px;font-size:11px;font-weight:600;white-space:nowrap}
+.b-approved{background:var(--green-bg);color:var(--green)}
+.b-waitlisted{background:var(--amber-bg);color:var(--amber)}
+.b-declined{background:var(--red-bg);color:var(--red)}
+.b-auto{background:var(--teal-bg);color:#0a6678}
+.b-parallel{background:var(--blue-bg);color:var(--blue)}
+.b-escalation{background:var(--amber-bg);color:var(--amber)}
+.b-senior{background:var(--purple-bg);color:var(--purple)}
+.b-high{background:var(--green-bg);color:var(--green)}
+.b-medium{background:var(--amber-bg);color:var(--amber)}
+.b-low{background:var(--red-bg);color:var(--red)}
+.b-agree{background:var(--green-bg);color:var(--green)}
+.b-disagree{background:var(--red-bg);color:var(--red)}
+
+/* ── Risk meter ── */
+.risk-bar-wrap{display:inline-block;width:56px;height:5px;background:var(--border);border-radius:2px;vertical-align:middle;overflow:hidden;margin:0 4px}
+.risk-bar{height:100%;border-radius:2px}
+
+/* ── Reviewer table extras ── */
+.reviewer-row{padding:10px 12px;border-bottom:0.5px solid var(--border);
+  display:flex;align-items:center;gap:10px}
+.reviewer-row:last-child{border-bottom:none}
+.rv-avatar{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
+.rv-name{font-size:13px;font-weight:500;flex:1}
+.rv-stats{display:flex;gap:14px;font-size:12px;color:var(--sub)}
+.rv-pct{font-size:14px;font-weight:700}
+.rv-drift{font-size:11px;padding:1px 7px;border-radius:8px}
+.rv-drift.ok{background:var(--green-bg);color:var(--green)}
+.rv-drift.warn{background:var(--red-bg);color:var(--red)}
+.rv-bar-wrap{width:100px;background:var(--border);border-radius:3px;height:6px;overflow:hidden}
+.rv-bar{height:100%;border-radius:3px;background:var(--teal)}
+
+/* ── Insight pills ── */
+.insights{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.insight{font-size:12px;color:var(--sub);padding:8px 10px;background:var(--lgrey);
+  border-radius:6px;border-left:3px solid var(--border);line-height:1.5}
+.insight.good{border-left-color:var(--green);background:var(--green-bg);color:var(--green)}
+.insight.warn{border-left-color:var(--amber);background:var(--amber-bg);color:var(--amber)}
+.insight.bad{border-left-color:var(--red);background:var(--red-bg);color:var(--red)}
+
+/* ── Score stats row ── */
+.stat-row{display:flex;gap:16px;font-size:11px;color:var(--sub);flex-wrap:wrap}
+.stat-row strong{color:var(--text)}
+
+/* ── Quadrant labels ── */
+.q-labels{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:6px}
+.q-lbl{font-size:10px;color:var(--sub);text-align:center;padding:3px 6px;
+  border:0.5px solid var(--border);border-radius:4px}
+
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:40px;color:var(--sub);text-align:center;gap:8px}
+.empty-state .icon{font-size:28px;opacity:.4}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+  <div class="topbar-title">Evaluation Dashboards</div>
+  <a href="/">← Evaluator</a>
+  <a href="/about" target="_blank">ℹ️ About</a>
+  <select class="preset-sel" id="preset-sel">
+    <option value="initial_screening">Initial Screening</option>
+    <option value="mission_assignment">Mission Assignment</option>
+    <option value="deep_space">Deep Space</option>
+  </select>
+  <div class="mode-toggle">
+    <button class="mode-btn active" id="btn-stub" onclick="setMode('stub')">Stub</button>
+    <button class="mode-btn" id="btn-live" onclick="setMode('live')">Live</button>
+  </div>
+  <button class="run-btn" id="run-btn" onclick="startEval()">▶ Run Evaluation</button>
+  <select class="preset-sel" id="past-runs-sel" onchange="loadPastRunDash(this.value)"
+    style="max-width:220px;cursor:pointer" title="Load a saved run">
+    <option value="">📁 Load past run…</option>
+  </select>
+</div>
+<div class="progress-bar-wrap"><div class="progress-bar" id="progress-bar"></div></div>
+
+<!-- Tab nav -->
+<div class="tab-nav">
+  <div class="tab-btn active" onclick="switchTab('funnel',this)">Funnel Overview</div>
+  <div class="tab-btn" onclick="switchTab('alignment',this)">AI–Human Alignment</div>
+  <div class="tab-btn" onclick="switchTab('routing',this)">Routing Intelligence</div>
+  <div class="tab-btn" onclick="switchTab('scores',this)">Score Distribution</div>
+  <div class="tab-btn" onclick="switchTab('risk',this)">Risk Signals</div>
+  <div class="tab-btn" onclick="switchTab('reviewers',this)">Reviewer Performance</div>
+</div>
+
+<div class="page">
+<div id="status-strip" class="status-strip hidden"></div>
+
+<!-- ══ TAB 1: FUNNEL OVERVIEW ═════════════════════════════════════════════════ -->
+<div class="tab-panel active" id="tab-funnel">
+  <div class="kpi-row kpi-row-5">
+    <div class="kpi" id="kpi-total" onclick="drill('all','funnel')">
+      <div class="kpi-lbl">Total evaluated</div>
+      <div class="kpi-val" id="kv-total">—</div>
+      <div class="kpi-sub" id="ks-total">awaiting run</div>
+    </div>
+    <div class="kpi" onclick="drill('approved','funnel')">
+      <div class="kpi-lbl"><span class="dot" style="background:var(--green)"></span>Approved</div>
+      <div class="kpi-val" id="kv-approved">—</div>
+      <div class="kpi-sub" id="ks-approved"></div>
+    </div>
+    <div class="kpi" onclick="drill('waitlisted','funnel')">
+      <div class="kpi-lbl"><span class="dot" style="background:var(--amber)"></span>Waitlisted</div>
+      <div class="kpi-val" id="kv-waitlisted">—</div>
+      <div class="kpi-sub" id="ks-waitlisted"></div>
+    </div>
+    <div class="kpi" onclick="drill('declined','funnel')">
+      <div class="kpi-lbl"><span class="dot" style="background:var(--red)"></span>Declined</div>
+      <div class="kpi-val" id="kv-declined">—</div>
+      <div class="kpi-sub" id="ks-declined"></div>
+    </div>
+    <div class="kpi" onclick="drill('disagreed','funnel')">
+      <div class="kpi-lbl">AI–Human agreement</div>
+      <div class="kpi-val" id="kv-agreement">—</div>
+      <div class="kpi-sub" id="ks-agreement"></div>
+    </div>
+  </div>
+
+  <div class="chart-grid-3">
+    <div class="cc">
+      <div class="cc-title">Decision funnel <span class="cc-badge" id="funnel-badge">live</span></div>
+      <div class="funnel-wrap" id="funnel-wrap">
+        <div class="empty-state"><div class="icon">⏳</div><div>Run evaluation to see funnel</div></div>
+      </div>
+    </div>
+    <div class="cc">
+      <div class="cc-title">Outcome distribution</div>
+      <div style="position:relative;height:190px"><canvas id="c-outcome" role="img" aria-label="Bar chart comparing AI recommendation vs final outcomes">No data.</canvas></div>
+      <div class="legend" id="lg-outcome"></div>
+    </div>
+    <div class="cc">
+      <div class="cc-title">Routing breakdown</div>
+      <div style="position:relative;height:190px"><canvas id="c-routing1" role="img" aria-label="Donut chart of routing tiers">No data.</canvas></div>
+      <div class="legend" id="lg-routing1"></div>
+    </div>
+  </div>
+  <div class="chart-grid-2">
+    <div class="cc">
+      <div class="cc-title">Score distribution <span class="cc-badge">approve ≥70 · waitlist 50–69 · decline &lt;50</span></div>
+      <div style="position:relative;height:170px"><canvas id="c-hist" role="img" aria-label="Histogram of scores in 10-point bins">No data.</canvas></div>
+      <div class="stat-row" id="score-stats" style="margin-top:8px"></div>
+    </div>
+    <div class="cc">
+      <div class="cc-title">AI confidence vs score <span class="cc-badge">colored by final outcome</span></div>
+      <div style="position:relative;height:170px"><canvas id="c-scatter1" role="img" aria-label="Scatter plot of AI confidence vs total score">No data.</canvas></div>
+    </div>
+  </div>
+  <div id="drill-funnel" class="hidden"></div>
+</div>
+
+<!-- ══ TAB 2: AI–HUMAN ALIGNMENT ═════════════════════════════════════════════ -->
+<div class="tab-panel" id="tab-alignment">
+  <div class="kpi-row kpi-row-4">
+    <div class="kpi" onclick="drill('all','alignment')">
+      <div class="kpi-lbl">Cases reviewed by human</div>
+      <div class="kpi-val" id="kv-reviewed">—</div>
+      <div class="kpi-sub" id="ks-reviewed"></div>
+    </div>
+    <div class="kpi" onclick="drill('agreed','alignment')">
+      <div class="kpi-lbl">Agreement rate</div>
+      <div class="kpi-val" id="kv-agr-pct">—</div>
+      <div class="kpi-sub" id="ks-agr-pct"></div>
+    </div>
+    <div class="kpi" onclick="drill('disagreed','alignment')">
+      <div class="kpi-lbl">Disagreements</div>
+      <div class="kpi-val" id="kv-disagr">—</div>
+      <div class="kpi-sub" id="ks-disagr"></div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-lbl">Avg score adjustment</div>
+      <div class="kpi-val" id="kv-delta">—</div>
+      <div class="kpi-sub" id="ks-delta"></div>
+    </div>
+  </div>
+  <div class="chart-grid-2">
+    <div class="cc">
+      <div class="cc-title">AI score vs human-adjusted score <span class="cc-badge">⬤ agree &nbsp;⬤ disagree</span></div>
+      <div style="position:relative;height:220px"><canvas id="c-align-scatter" role="img" aria-label="Scatter of AI score vs human adjusted score">No data.</canvas></div>
+    </div>
+    <div class="cc">
+      <div class="cc-title">AI recommendation vs final outcome</div>
+      <div style="position:relative;height:220px"><canvas id="c-flip" role="img" aria-label="Grouped bar chart of AI vs human outcomes">No data.</canvas></div>
+      <div class="legend" id="lg-flip"></div>
+    </div>
+  </div>
+  <div class="cc chart-grid-1">
+    <div class="cc-title">Disagreement cases <span class="cc-badge" id="disagr-count-lbl"></span></div>
+    <div id="disagr-table"></div>
+    <div class="insights" id="cal-insights"></div>
+  </div>
+  <div id="drill-alignment" class="hidden"></div>
+</div>
+
+<!-- ══ TAB 3: ROUTING INTELLIGENCE ══════════════════════════════════════════════ -->
+<div class="tab-panel" id="tab-routing">
+  <div class="kpi-row kpi-row-4">
+    <div class="kpi" onclick="drill('Auto Decision','routing')">
+      <div class="kpi-lbl"><span class="dot" style="background:#0097b2"></span>Auto Decision</div>
+      <div class="kpi-val" id="kv-r-auto">—</div>
+      <div class="kpi-sub" id="ks-r-auto"></div>
+    </div>
+    <div class="kpi" onclick="drill('Parallel Review','routing')">
+      <div class="kpi-lbl"><span class="dot" style="background:#3949ab"></span>Parallel Review</div>
+      <div class="kpi-val" id="kv-r-parallel">—</div>
+      <div class="kpi-sub" id="ks-r-parallel"></div>
+    </div>
+    <div class="kpi" onclick="drill('Escalation','routing')">
+      <div class="kpi-lbl"><span class="dot" style="background:#e07b00"></span>Escalation</div>
+      <div class="kpi-val" id="kv-r-esc">—</div>
+      <div class="kpi-sub" id="ks-r-esc"></div>
+    </div>
+    <div class="kpi" onclick="drill('Senior Adjudication','routing')">
+      <div class="kpi-lbl"><span class="dot" style="background:#7b2d8b"></span>Senior Adjudication</div>
+      <div class="kpi-val" id="kv-r-senior">—</div>
+      <div class="kpi-sub" id="ks-r-senior"></div>
+    </div>
+  </div>
+  <div class="chart-grid-2">
+    <div class="cc">
+      <div class="cc-title">Cases per routing tier</div>
+      <div style="position:relative;height:210px"><canvas id="c-routing-bar" role="img" aria-label="Horizontal bar chart of routing tier counts">No data.</canvas></div>
+    </div>
+    <div class="cc">
+      <div class="cc-title">Avg score &amp; avg composite risk per tier</div>
+      <div style="position:relative;height:210px"><canvas id="c-routing-stats" role="img" aria-label="Grouped bar chart of avg score and risk per routing tier">No data.</canvas></div>
+      <div class="legend" id="lg-routing-stats"></div>
+    </div>
+  </div>
+  <div class="cc chart-grid-1">
+    <div class="cc-title">Outcome distribution per routing tier</div>
+    <div style="position:relative;height:180px"><canvas id="c-routing-outcome" role="img" aria-label="Stacked bar chart of outcomes per routing tier">No data.</canvas></div>
+    <div class="legend" id="lg-routing-outcome" style="margin-top:8px"></div>
+  </div>
+  <div id="drill-routing" class="hidden"></div>
+</div>
+
+<!-- ══ TAB 4: SCORE DISTRIBUTION ════════════════════════════════════════════════ -->
+<div class="tab-panel" id="tab-scores">
+  <div class="kpi-row kpi-row-4">
+    <div class="kpi">
+      <div class="kpi-lbl">Mean score</div>
+      <div class="kpi-val" id="kv-mean">—</div>
+      <div class="kpi-sub">out of 100</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-lbl">Median score</div>
+      <div class="kpi-val" id="kv-median">—</div>
+      <div class="kpi-sub">50th percentile</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-lbl">Near-cutoff cases</div>
+      <div class="kpi-val" id="kv-near">—</div>
+      <div class="kpi-sub" id="ks-near">within ±5 pts of 50 or 70</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-lbl">Score std dev</div>
+      <div class="kpi-val" id="kv-std">—</div>
+      <div class="kpi-sub">spread of scores</div>
+    </div>
+  </div>
+  <div class="chart-grid-2r">
+    <div class="cc">
+      <div class="cc-title">Score histogram <span class="cc-badge">stacked by outcome · approve ≥70 · waitlist 50–69</span></div>
+      <div style="position:relative;height:210px"><canvas id="c-hist2" role="img" aria-label="Stacked histogram of scores by outcome">No data.</canvas></div>
+    </div>
+    <div class="cc">
+      <div class="cc-title">Avg rubric dimension scores <span class="cc-badge">each dimension 0–25</span></div>
+      <div style="position:relative;height:210px"><canvas id="c-radar" role="img" aria-label="Radar chart of average rubric dimension scores">No data.</canvas></div>
+    </div>
+  </div>
+  <div class="chart-grid-2">
+    <div class="cc">
+      <div class="cc-title">Score by confidence level</div>
+      <div style="position:relative;height:170px"><canvas id="c-conf-score" role="img" aria-label="Box-style bar chart of score ranges per confidence level">No data.</canvas></div>
+    </div>
+    <div class="cc">
+      <div class="cc-title">Rubric dimension breakdown per outcome</div>
+      <div style="position:relative;height:170px"><canvas id="c-dim-outcome" role="img" aria-label="Grouped bar chart of rubric dimensions per outcome">No data.</canvas></div>
+      <div class="legend" id="lg-dim-outcome" style="margin-top:6px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TAB 5: RISK SIGNAL MONITOR ═══════════════════════════════════════════════ -->
+<div class="tab-panel" id="tab-risk">
+  <div class="kpi-row kpi-row-4">
+    <div class="kpi">
+      <div class="kpi-lbl">Avg composite risk</div>
+      <div class="kpi-val" id="kv-risk-avg">—</div>
+      <div class="kpi-sub">0 = low · 1 = high</div>
+    </div>
+    <div class="kpi" onclick="drill('high-risk','risk')">
+      <div class="kpi-lbl">High-risk cases</div>
+      <div class="kpi-val" id="kv-risk-high">—</div>
+      <div class="kpi-sub" id="ks-risk-high">composite risk &gt; 0.6</div>
+    </div>
+    <div class="kpi" onclick="drill('near-cutoff','risk')">
+      <div class="kpi-lbl">Near-cutoff cases</div>
+      <div class="kpi-val" id="kv-near-cutoff">—</div>
+      <div class="kpi-sub">within ±5 pts of boundary</div>
+    </div>
+    <div class="kpi" onclick="drill('evidence-mismatch','risk')">
+      <div class="kpi-lbl">Evidence mismatches</div>
+      <div class="kpi-val" id="kv-mismatch">—</div>
+      <div class="kpi-sub">score ≠ narrative signal</div>
+    </div>
+  </div>
+  <div class="chart-grid-2">
+    <div class="cc">
+      <div class="cc-title">Sensitivity vs disagreement score <span class="cc-badge">bubble = composite risk · color = routing</span></div>
+      <div style="position:relative;height:230px"><canvas id="c-risk-bubble" role="img" aria-label="Bubble scatter plot of sensitivity vs disagreement, bubble size is composite risk">No data.</canvas></div>
+      <div class="q-labels">
+        <div class="q-lbl">↖ Low sensitivity, high disagreement</div>
+        <div class="q-lbl">↗ High sensitivity &amp; disagreement → escalate</div>
+        <div class="q-lbl">↙ Low risk → auto-decide</div>
+        <div class="q-lbl">↘ High sensitivity, low disagreement</div>
+      </div>
+    </div>
+    <div class="cc">
+      <div class="cc-title">Composite risk distribution per routing tier</div>
+      <div style="position:relative;height:230px"><canvas id="c-risk-tier" role="img" aria-label="Bar chart of avg composite risk per routing tier">No data.</canvas></div>
+    </div>
+  </div>
+  <div class="chart-grid-2">
+    <div class="cc">
+      <div class="cc-title">Rubric variance distribution <span class="cc-badge">high variance = uneven dimension scores</span></div>
+      <div style="position:relative;height:160px"><canvas id="c-variance" role="img" aria-label="Histogram of rubric variance values">No data.</canvas></div>
+    </div>
+    <div class="cc">
+      <div class="cc-title">Signal flags breakdown</div>
+      <div id="signal-flags-wrap" style="padding:6px 0"></div>
+    </div>
+  </div>
+  <div id="drill-risk" class="hidden"></div>
+</div>
+
+<!-- ══ TAB 6: REVIEWER PERFORMANCE ══════════════════════════════════════════════ -->
+<div class="tab-panel" id="tab-reviewers">
+  <div class="kpi-row kpi-row-4">
+    <div class="kpi">
+      <div class="kpi-lbl">Total human reviews</div>
+      <div class="kpi-val" id="kv-rv-total">—</div>
+      <div class="kpi-sub" id="ks-rv-total"></div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-lbl">Active reviewers</div>
+      <div class="kpi-val" id="kv-rv-count">—</div>
+      <div class="kpi-sub">unique reviewers</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-lbl">Drift flags</div>
+      <div class="kpi-val" id="kv-rv-drift">—</div>
+      <div class="kpi-sub">agreement rate &lt; 60%</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-lbl">Largest avg adjustment</div>
+      <div class="kpi-val" id="kv-rv-maxadj">—</div>
+      <div class="kpi-sub" id="ks-rv-maxadj">pts from AI score</div>
+    </div>
+  </div>
+  <div class="chart-grid-2">
+    <div class="cc">
+      <div class="cc-title">Agreement rate per reviewer</div>
+      <div style="position:relative;height:220px"><canvas id="c-rv-agree" role="img" aria-label="Horizontal bar chart of agreement rate per reviewer">No data.</canvas></div>
+    </div>
+    <div class="cc">
+      <div class="cc-title">Avg score adjustment per reviewer <span class="cc-badge">+ = reviewer scores higher than AI</span></div>
+      <div style="position:relative;height:220px"><canvas id="c-rv-adj" role="img" aria-label="Bar chart of average score adjustments per reviewer">No data.</canvas></div>
+    </div>
+  </div>
+  <div class="cc chart-grid-1">
+    <div class="cc-title">Reviewer summary</div>
+    <div id="rv-table"></div>
+  </div>
+  <div id="drill-reviewers" class="hidden"></div>
+</div>
+
+</div><!-- /page -->
+
+<script>
+// ════════════════════════════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════════════════════════════
+let decisions = [], calibration = null, jobId = null, pollTimer = null, mode = 'stub';
+let activeTab = 'funnel';
+let drillFilter = {}, drillExpanded = {};
+const charts = {}; // keyed by canvas id
+const DIM_LABELS = { academic:'Technical', financial:'Physical/Med', leadership:'Mission', essay:'Psych' };
+
+// ════════════════════════════════════════════════════════════════════════
+// BOOTSTRAP
+// ════════════════════════════════════════════════════════════════════════
+(function init() {
+  try {
+    const d = sessionStorage.getItem('dash_d');
+    const c = sessionStorage.getItem('dash_c');
+    if (d) { decisions = JSON.parse(d); if (c) calibration = JSON.parse(c); refreshAll(); }
+  } catch(e) {}
+  fetch('/api/config').then(r=>r.json()).then(cfg => {
+    if (!cfg.live_mode_enabled) {
+      const liveBtn = document.getElementById('btn-live');
+      if (liveBtn) {
+        liveBtn.classList.add('hidden');
+        liveBtn.title = 'Live Claude mode is disabled on this public deployment.';
+      }
+      if (mode === 'live') setMode('stub');
+    }
+  }).catch(() => {});
+  loadPastRunsDash();
+})();
+
+// ════════════════════════════════════════════════════════════════════════
+// TABS
+// ════════════════════════════════════════════════════════════════════════
+function switchTab(id, el) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-' + id).classList.add('active');
+  activeTab = id;
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// RUN / POLL
+// ════════════════════════════════════════════════════════════════════════
+function setMode(m) {
+  mode = m;
+  document.getElementById('btn-stub').classList.toggle('active', m === 'stub');
+  document.getElementById('btn-live').classList.toggle('active', m === 'live');
+}
+
+async function startEval() {
+  if (jobId) return;
+  decisions = []; calibration = null;
+  drillFilter = {}; drillExpanded = {};
+  destroyAll();
+  resetKPIs();
+  hideDrills();
+
+  const btn = document.getElementById('run-btn');
+  btn.textContent = '⏳ Running…'; btn.disabled = true; btn.classList.add('running');
+  showStrip('running', '<span class="spin">↻</span> Starting evaluation…');
+
+  try {
+    const r = await fetch('/api/evaluate', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ mode, policy: { program_type: document.getElementById('preset-sel').value } })
+    });
+    const d = await r.json();
+    if (d.error) { showStrip('error', d.error); resetBtn(); return; }
+    jobId = d.job_id;
+    pollTimer = setInterval(doPoll, 600);
+  } catch(e) {
+    showStrip('error', 'Cannot connect to server. Is the app running on port 5000?');
+    resetBtn();
+  }
+}
+
+async function doPoll() {
+  if (!jobId) return;
+  try {
+    const r = await fetch(`/api/poll/${jobId}`);
+    if (r.status === 404) { stopPoll(); return; }
+    const d = await r.json();
+    (d.events || []).forEach(handleEvent);
+    if (d.status === 'done' || d.status === 'error') stopPoll();
+  } catch(e) {}
+}
+
+function handleEvent(ev) {
+  if (ev.type === 'start') {
+    showStrip('running', `<span class="spin">↻</span> Evaluating ${ev.total} candidates…`);
+    setProgress(0, ev.total);
+  } else if (ev.type === 'processing') {
+    setProgress(ev.index - 1, ev.total);
+    showStrip('running', `<span class="spin">↻</span> ${ev.index}/${ev.total} — ${ev.name}`);
+  } else if (ev.type === 'result') {
+    decisions.push(ev.decision);
+    setProgress(ev.index, ev.total);
+    refreshAll();
+  } else if (ev.type === 'calibration') {
+    calibration = ev.report;
+    renderAlignment();
+  } else if (ev.type === 'done') {
+    setProgress(decisions.length, decisions.length);
+    showStrip('done', `✓ Complete — ${decisions.length} candidates evaluated`);
+    resetBtn();
+    try { sessionStorage.setItem('dash_d', JSON.stringify(decisions)); if (calibration) sessionStorage.setItem('dash_c', JSON.stringify(calibration)); } catch(e) {}
+    loadPastRunsDash();
+  } else if (ev.type === 'error') {
+    showStrip('error', ev.message || 'Error during evaluation');
+    resetBtn();
+  }
+}
+
+function stopPoll() { clearInterval(pollTimer); pollTimer = null; jobId = null; }
+function setProgress(n, t) { document.getElementById('progress-bar').style.width = (t > 0 ? Math.round(n/t*100) : 0) + '%'; }
+function resetBtn() { stopPoll(); const b = document.getElementById('run-btn'); b.textContent = '▶ Run Evaluation'; b.disabled = false; b.classList.remove('running'); }
+
+// ════════════════════════════════════════════════════════════════════════
+// REFRESH ALL
+// ════════════════════════════════════════════════════════════════════════
+function refreshAll() {
+  if (!decisions.length) return;
+  renderFunnelKPIs();
+  renderFunnel();
+  renderOutcomeChart();
+  renderRoutingDonut();
+  renderHistogram('c-hist');
+  renderScatter1();
+  renderAlignment();
+  renderRoutingTab();
+  renderScoresTab();
+  renderRiskTab();
+  renderReviewerTab();
+  refreshActiveDrill();
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════════════════════════════════
+const C = (a) => a.reduce((s,x) => s+x, 0);
+const AVG = (a) => a.length ? C(a)/a.length : 0;
+const PCT = (n,d) => d > 0 ? (n/d*100).toFixed(1)+'%' : '0%';
+const FMT = (n) => typeof n === 'number' ? (Number.isInteger(n) ? n : n.toFixed(1)) : n;
+function countBy(arr, fn) { return arr.reduce((o,x) => { const k=fn(x); o[k]=(o[k]||0)+1; return o; }, {}); }
+function groupBy(arr, fn) { return arr.reduce((o,x) => { const k=fn(x); (o[k]=o[k]||[]).push(x); return o; }, {}); }
+function stdDev(arr) { const m=AVG(arr); return Math.sqrt(AVG(arr.map(x=>(x-m)**2))); }
+
+const OUTCOME_COLORS = { approved:'#1d7a4e', waitlisted:'#a05c00', declined:'#b52b2b' };
+const OUTCOME_BG     = { approved:'#e8f5e9', waitlisted:'#fff4e0', declined:'#fdecea' };
+const ROUTE_KEYS     = ['Auto Decision','Parallel Review','Escalation','Senior Adjudication'];
+const ROUTE_COLORS   = { 'Auto Decision':'#0097b2', 'Parallel Review':'#3949ab', 'Escalation':'#e07b00', 'Senior Adjudication':'#7b2d8b' };
+const RV_COLORS      = ['#0097b2','#3949ab','#e07b00','#7b2d8b','#1d7a4e'];
+
+function mkChart(id, type, data, options) {
+  if (charts[id]) { charts[id].destroy(); }
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+  charts[id] = new Chart(canvas, { type, data, options });
+  return charts[id];
+}
+
+function showStrip(type, msg) {
+  const el = document.getElementById('status-strip');
+  el.innerHTML = msg; el.className = 'status-strip ' + type; el.classList.remove('hidden');
+}
+
+function hideDrills() {
+  document.querySelectorAll('[id^="drill-"]').forEach(el => { el.innerHTML=''; el.classList.add('hidden'); });
+  document.querySelectorAll('.kpi').forEach(k => k.classList.remove('active'));
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// TAB 1 — FUNNEL OVERVIEW
+// ════════════════════════════════════════════════════════════════════════
+function resetKPIs() {
+  ['total','approved','waitlisted','declined','agreement'].forEach(k => {
+    const v=document.getElementById('kv-'+k), s=document.getElementById('ks-'+k);
+    if(v) v.textContent='—'; if(s) s.textContent='';
+  });
+}
+
+function renderFunnelKPIs() {
+  const n = decisions.length; if (!n) return;
+  const oc = countBy(decisions, d => d.final_outcome);
+  document.getElementById('kv-total').textContent    = n;
+  document.getElementById('ks-total').textContent    = 'candidates';
+  document.getElementById('kv-approved').textContent = oc.approved || 0;
+  document.getElementById('ks-approved').textContent = PCT(oc.approved||0, n);
+  document.getElementById('kv-waitlisted').textContent= oc.waitlisted||0;
+  document.getElementById('ks-waitlisted').textContent= PCT(oc.waitlisted||0,n);
+  document.getElementById('kv-declined').textContent = oc.declined||0;
+  document.getElementById('ks-declined').textContent = PCT(oc.declined||0,n);
+  const wh = decisions.filter(d=>d.agreed!==null), ag = wh.filter(d=>d.agreed).length;
+  document.getElementById('kv-agreement').textContent = wh.length ? PCT(ag,wh.length) : '—';
+  document.getElementById('ks-agreement').textContent = `${ag}/${wh.length} reviewed`;
+}
+
+function renderFunnel() {
+  const n = decisions.length; if (!n) return;
+  const rt = countBy(decisions, d=>d.review_type);
+  const oc = countBy(decisions, d=>d.final_outcome);
+  const steps = [
+    { label:'Total evaluated',     count:n,                          color:'#334e6e', filter:'all' },
+    ...ROUTE_KEYS.filter(k=>rt[k]).map(k=>({ label:k, count:rt[k], color:ROUTE_COLORS[k], filter:k }))
+  ];
+  const outcomeSteps = Object.entries(oc).map(([k,v])=>({ label:k.charAt(0).toUpperCase()+k.slice(1), count:v, color:OUTCOME_COLORS[k]||'#888', filter:k }));
+
+  let html = '';
+  steps.forEach((s,i) => {
+    const w = Math.max(s.count/n*100, 14);
+    html += `<div class="funnel-step">
+      <div class="funnel-bar" style="width:${w}%;background:${s.color}" onclick="drill('${s.filter}','funnel')">
+        <span>${s.label}</span><strong>${s.count}</strong>
+      </div>
+      ${i>0?`<div class="funnel-pct">${PCT(s.count,n)}</div>`:''}
+    </div>`;
+    if (i < steps.length-1) html += '<div class="funnel-arrow">▾</div>';
+  });
+  html += '<div class="funnel-arrow">▾</div>';
+  html += '<div style="display:flex;gap:5px;width:100%;justify-content:center">';
+  outcomeSteps.forEach(s => {
+    html += `<div onclick="drill('${s.filter}','funnel')" style="flex:${s.count};height:28px;min-width:32px;background:${s.color};border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:11px;font-weight:700;color:#fff">${s.count}</div>`;
+  });
+  html += '</div>';
+  document.getElementById('funnel-wrap').innerHTML = html;
+  document.getElementById('funnel-badge').textContent = n + ' cases';
+}
+
+function renderOutcomeChart() {
+  const oc = countBy(decisions, d=>d.final_outcome);
+  const ar = countBy(decisions, d=>d.ai_recommendation);
+  const keys = ['approved','waitlisted','declined'];
+  mkChart('c-outcome','bar',{
+    labels:['Approved','Waitlisted','Declined'],
+    datasets:[
+      { label:'Final outcome',       data:keys.map(k=>oc[k]||0), backgroundColor:['#1d7a4e','#a05c00','#b52b2b'], borderRadius:3, barPercentage:.5 },
+      { label:'AI recommendation',   data:keys.map(k=>ar[k]||0), backgroundColor:['#e8f5e9','#fff4e0','#fdecea'], borderColor:['#1d7a4e','#a05c00','#b52b2b'], borderWidth:1.5, borderRadius:3, barPercentage:.5 },
+    ]
+  },{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.parsed.y} (${PCT(c.parsed.y,decisions.length)})`}} },
+    scales:{ x:{grid:{display:false},ticks:{font:{size:11}}}, y:{beginAtZero:true,grid:{color:'#f0f2f5'},ticks:{precision:0,font:{size:11}}} }
+  });
+  document.getElementById('lg-outcome').innerHTML = [
+    {l:'Final outcome',c:'#888',dash:false},{l:'AI recommendation',c:'#ccc',dash:true}
+  ].map(x=>`<span class="li"><span class="ls" style="background:${x.c}"></span>${x.l}</span>`).join('');
+}
+
+function renderRoutingDonut() {
+  const rt = countBy(decisions, d=>d.review_type);
+  const vals = ROUTE_KEYS.map(k=>rt[k]||0);
+  if (vals.every(v=>v===0)) return;
+  mkChart('c-routing1','doughnut',{
+    labels: ROUTE_KEYS,
+    datasets:[{ data:vals, backgroundColor:ROUTE_KEYS.map(k=>ROUTE_COLORS[k]), borderWidth:2, borderColor:'#fff', hoverOffset:4 }]
+  },{ responsive:true, maintainAspectRatio:false, cutout:'60%',
+    plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>` ${c.label}: ${c.parsed} (${PCT(c.parsed,decisions.length)})`}} }
+  });
+  document.getElementById('lg-routing1').innerHTML = ROUTE_KEYS.filter(k=>rt[k]).map(k=>
+    `<span class="li"><span class="ls" style="background:${ROUTE_COLORS[k]}"></span>${k}: ${rt[k]}</span>`).join('');
+}
+
+function renderHistogram(canvasId) {
+  const approved=Array(10).fill(0), waitlisted=Array(10).fill(0), declined=Array(10).fill(0);
+  decisions.forEach(d=>{
+    const b=Math.min(9,Math.floor(d.total_score/10));
+    if(d.final_outcome==='approved') approved[b]++;
+    else if(d.final_outcome==='waitlisted') waitlisted[b]++;
+    else declined[b]++;
+  });
+  mkChart(canvasId,'bar',{
+    labels:Array.from({length:10},(_,i)=>`${i*10}–${i*10+9}`),
+    datasets:[
+      {label:'Approved',   data:approved,   backgroundColor:'#1d7a4e', stack:'s', borderRadius:2},
+      {label:'Waitlisted', data:waitlisted, backgroundColor:'#a05c00', stack:'s', borderRadius:2},
+      {label:'Declined',   data:declined,   backgroundColor:'#b52b2b', stack:'s', borderRadius:2},
+    ]
+  },{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false}},
+    scales:{
+      x:{stacked:true,grid:{display:false},ticks:{font:{size:10},maxRotation:45,autoSkip:false}},
+      y:{stacked:true,beginAtZero:true,grid:{color:'#f0f2f5'},ticks:{precision:0,font:{size:10}}}
+    }
+  });
+  const scores=decisions.map(d=>d.total_score), sorted=[...scores].sort((a,b)=>a-b);
+  const mean=AVG(scores), median=sorted[Math.floor(sorted.length/2)];
+  const el=document.getElementById('score-stats');
+  if(el) el.innerHTML=[`Mean: <strong>${mean.toFixed(1)}</strong>`,`Median: <strong>${median.toFixed(1)}</strong>`,`Min: <strong>${sorted[0].toFixed(1)}</strong>`,`Max: <strong>${sorted[sorted.length-1].toFixed(1)}</strong>`].join(' &nbsp;·&nbsp; ');
+}
+
+function renderScatter1() {
+  const ds = ['approved','waitlisted','declined'].map((oc,i)=>({
+    label: oc.charAt(0).toUpperCase()+oc.slice(1),
+    data: decisions.filter(d=>d.final_outcome===oc).map(d=>({x:d.total_score,y:d.confidence,name:d.name})),
+    backgroundColor: ['#1d7a4ecc','#a05c00cc','#b52b2bcc'][i], pointRadius:5, pointHoverRadius:7
+  }));
+  mkChart('c-scatter1','scatter',{datasets:ds},{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.raw.name} — score: ${c.raw.x.toFixed(1)}, conf: ${c.raw.y.toFixed(2)}`}}},
+    scales:{
+      x:{min:0,max:105,title:{display:true,text:'Total score',font:{size:10}},grid:{color:'#f0f2f5'},ticks:{font:{size:10}}},
+      y:{min:0,max:1.05,title:{display:true,text:'Confidence',font:{size:10}},grid:{color:'#f0f2f5'},ticks:{font:{size:10},callback:v=>v.toFixed(1)}}
+    }
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// TAB 2 — AI–HUMAN ALIGNMENT
+// ════════════════════════════════════════════════════════════════════════
+function renderAlignment() {
+  const reviewed = decisions.filter(d=>d.agreed!==null);
+  const agreed   = reviewed.filter(d=>d.agreed===true);
+  const disagreed= reviewed.filter(d=>d.agreed===false);
+  const n = reviewed.length;
+  const adjs = reviewed.map(d=>d.human_review?.adjustment||0);
+  const avgAdj = AVG(adjs);
+
+  document.getElementById('kv-reviewed').textContent = n;
+  document.getElementById('ks-reviewed').textContent = `of ${decisions.length} total`;
+  document.getElementById('kv-agr-pct').textContent  = n ? PCT(agreed.length,n) : '—';
+  document.getElementById('ks-agr-pct').textContent  = `${agreed.length}/${n} cases`;
+  document.getElementById('kv-disagr').textContent   = disagreed.length;
+  document.getElementById('ks-disagr').textContent   = PCT(disagreed.length,n);
+  document.getElementById('kv-delta').textContent    = n ? (avgAdj>=0?'+':'')+avgAdj.toFixed(2) : '—';
+  document.getElementById('ks-delta').textContent    = avgAdj>=0?'reviewers score higher':'reviewers score lower';
+
+  // Scatter: AI score vs human-adjusted score
+  const dsAgree = { label:'Agreed', data: agreed.map(d=>({x:d.total_score,y:d.total_score+(d.human_review?.adjustment||0),name:d.name})), backgroundColor:'#1d7a4ecc', pointRadius:5 };
+  const dsDisagr= { label:'Disagreed', data: disagreed.map(d=>({x:d.total_score,y:d.total_score+(d.human_review?.adjustment||0),name:d.name})), backgroundColor:'#b52b2bcc', pointRadius:6 };
+  // diagonal reference line
+  const refLine = { label:'Perfect agreement', data:[{x:0,y:0},{x:100,y:100}], type:'line', borderColor:'#e2e6ea', borderWidth:1.5, borderDash:[4,4], pointRadius:0, fill:false };
+  mkChart('c-align-scatter','scatter',{ datasets:[dsAgree,dsDisagr,refLine] },{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{filter:i=>i.datasetIndex<2,callbacks:{label:c=>` ${c.raw.name||''}: AI ${c.raw.x.toFixed(1)} → human ${c.raw.y.toFixed(1)}`}}},
+    scales:{
+      x:{min:0,max:105,title:{display:true,text:'AI score',font:{size:10}},grid:{color:'#f0f2f5'},ticks:{font:{size:10}}},
+      y:{min:0,max:105,title:{display:true,text:'Human-adjusted score',font:{size:10}},grid:{color:'#f0f2f5'},ticks:{font:{size:10}}}
+    }
+  });
+
+  // Grouped bar: AI rec vs final outcome
+  const outcomes = ['approved','waitlisted','declined'];
+  const labels = ['Approved','Waitlisted','Declined'];
+  const aiCounts = countBy(decisions, d=>d.ai_recommendation);
+  const finalCounts = countBy(decisions, d=>d.final_outcome);
+  mkChart('c-flip','bar',{
+    labels,
+    datasets:[
+      {label:'AI recommendation',  data:outcomes.map(k=>aiCounts[k]||0),    backgroundColor:['#e8f5e9','#fff4e0','#fdecea'], borderColor:['#1d7a4e','#a05c00','#b52b2b'], borderWidth:1.5, borderRadius:3, barPercentage:.5},
+      {label:'Final outcome',      data:outcomes.map(k=>finalCounts[k]||0), backgroundColor:['#1d7a4e','#a05c00','#b52b2b'], borderRadius:3, barPercentage:.5},
+    ]
+  },{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.parsed.y}`}}},
+    scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{beginAtZero:true,grid:{color:'#f0f2f5'},ticks:{precision:0,font:{size:11}}}}
+  });
+  document.getElementById('lg-flip').innerHTML = [
+    {l:'AI recommendation',c:'#ccc'},{l:'Final outcome',c:'#888'}
+  ].map(x=>`<span class="li"><span class="ls" style="background:${x.c}"></span>${x.l}</span>`).join('');
+
+  // Disagreement table
+  document.getElementById('disagr-count-lbl').textContent = disagreed.length + ' cases';
+  if (disagreed.length) {
+    document.getElementById('disagr-table').innerHTML = `<table class="dt">
+      <thead><tr><th>Candidate</th><th>Score</th><th>AI rec</th><th>Human outcome</th><th>Adjustment</th><th>Override reason</th></tr></thead>
+      <tbody>${disagreed.map(d=>`<tr>
+        <td style="font-weight:500">${d.name}</td>
+        <td>${d.total_score.toFixed(1)}</td>
+        <td><span class="badge b-${d.ai_recommendation}">${d.ai_recommendation}</span></td>
+        <td><span class="badge b-${d.human_review.outcome}">${d.human_review.outcome}</span></td>
+        <td>${d.human_review.adjustment>=0?'+':''}${d.human_review.adjustment.toFixed(1)} pts</td>
+        <td style="color:var(--sub);font-size:12px">${d.human_review.override||'—'}</td>
+      </tr>`).join('')}</tbody></table>`;
+  } else {
+    document.getElementById('disagr-table').innerHTML = '<div class="empty-state"><div>No disagreements yet</div></div>';
+  }
+
+  // Calibration insights
+  if (calibration?.insights?.length) {
+    document.getElementById('cal-insights').innerHTML = calibration.insights.map(s => {
+      const cls = s.startsWith('✓')||s.includes('strong')||s.includes('Strong') ? 'good'
+                : s.includes('⚠')||s.includes('Low alignment')||s.includes('below') ? 'bad'
+                : s.includes('Moderate')||s.includes('pattern') ? 'warn' : '';
+      return `<div class="insight ${cls}">${s}</div>`;
+    }).join('');
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// TAB 3 — ROUTING INTELLIGENCE
+// ════════════════════════════════════════════════════════════════════════
+function renderRoutingTab() {
+  const n = decisions.length; if (!n) return;
+  const rt = countBy(decisions, d=>d.review_type);
+  const grp = groupBy(decisions, d=>d.review_type);
+
+  // KPI cards
+  const kMap = {'Auto Decision':'r-auto','Parallel Review':'r-parallel','Escalation':'r-esc','Senior Adjudication':'r-senior'};
+  ROUTE_KEYS.forEach(k => {
+    const cnt = rt[k]||0;
+    document.getElementById('kv-'+kMap[k]).textContent = cnt;
+    document.getElementById('ks-'+kMap[k]).textContent = PCT(cnt,n);
+  });
+
+  // Horizontal bar: cases per tier
+  const barData = ROUTE_KEYS.map(k=>rt[k]||0);
+  mkChart('c-routing-bar','bar',{
+    labels: ROUTE_KEYS,
+    datasets:[{ data:barData, backgroundColor:ROUTE_KEYS.map(k=>ROUTE_COLORS[k]), borderRadius:4, barPercentage:.5 }]
+  },{
+    indexAxis:'y', responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.parsed.x} cases (${PCT(c.parsed.x,n)})`}}},
+    scales:{x:{beginAtZero:true,grid:{color:'#f0f2f5'},ticks:{precision:0,font:{size:11}}},y:{grid:{display:false},ticks:{font:{size:11}}}}
+  });
+
+  // Grouped bar: avg score + avg risk per tier
+  const avgScores = ROUTE_KEYS.map(k => grp[k] ? AVG(grp[k].map(d=>d.total_score)) : 0);
+  const avgRisks  = ROUTE_KEYS.map(k => grp[k] ? AVG(grp[k].map(d=>d.signals?.composite_risk||0))*100 : 0);
+  mkChart('c-routing-stats','bar',{
+    labels: ROUTE_KEYS.map(k=>k.replace(' Review','').replace(' Adjudication','')),
+    datasets:[
+      {label:'Avg score',       data:avgScores.map(v=>+v.toFixed(1)), backgroundColor:'#0097b255', borderColor:'#0097b2', borderWidth:1.5, borderRadius:3, barPercentage:.45, yAxisID:'y'},
+      {label:'Avg risk (×100)', data:avgRisks.map(v=>+v.toFixed(1)),  backgroundColor:'#b52b2b55', borderColor:'#b52b2b', borderWidth:1.5, borderRadius:3, barPercentage:.45, yAxisID:'y'},
+    ]
+  },{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{y:{beginAtZero:true,max:100,grid:{color:'#f0f2f5'},ticks:{font:{size:11}}},x:{grid:{display:false},ticks:{font:{size:11}}}}
+  });
+  document.getElementById('lg-routing-stats').innerHTML = [
+    {l:'Avg score (0–100)',c:'#0097b2'},{l:'Avg composite risk (×100)',c:'#b52b2b'}
+  ].map(x=>`<span class="li"><span class="ls" style="background:${x.c}"></span>${x.l}</span>`).join('');
+
+  // Stacked bar: outcome per tier
+  const outcomes = ['approved','waitlisted','declined'];
+  mkChart('c-routing-outcome','bar',{
+    labels: ROUTE_KEYS.map(k=>k.replace(' Review','').replace(' Adjudication','')),
+    datasets: outcomes.map((oc,i)=>({
+      label: oc.charAt(0).toUpperCase()+oc.slice(1),
+      data: ROUTE_KEYS.map(k => (grp[k]||[]).filter(d=>d.final_outcome===oc).length),
+      backgroundColor: [OUTCOME_COLORS.approved, OUTCOME_COLORS.waitlisted, OUTCOME_COLORS.declined][i],
+      stack:'s', borderRadius:2
+    }))
+  },{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false}},
+    scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:11}}},y:{stacked:true,beginAtZero:true,grid:{color:'#f0f2f5'},ticks:{precision:0,font:{size:11}}}}
+  });
+  document.getElementById('lg-routing-outcome').innerHTML = outcomes.map(k=>
+    `<span class="li"><span class="ls" style="background:${OUTCOME_COLORS[k]}"></span>${k.charAt(0).toUpperCase()+k.slice(1)}</span>`).join('');
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// TAB 4 — SCORE DISTRIBUTION
+// ════════════════════════════════════════════════════════════════════════
+function renderScoresTab() {
+  const scores = decisions.map(d=>d.total_score);
+  const sorted = [...scores].sort((a,b)=>a-b);
+  const mean = AVG(scores), median = sorted[Math.floor(sorted.length/2)], sd = stdDev(scores);
+  const nearCutoff = decisions.filter(d=>(Math.abs(d.total_score-70)<=5||Math.abs(d.total_score-50)<=5)).length;
+
+  document.getElementById('kv-mean').textContent   = mean.toFixed(1);
+  document.getElementById('kv-median').textContent = median.toFixed(1);
+  document.getElementById('kv-near').textContent   = nearCutoff;
+  document.getElementById('ks-near').textContent   = PCT(nearCutoff,decisions.length);
+  document.getElementById('kv-std').textContent    = sd.toFixed(1);
+
+  renderHistogram('c-hist2');
+
+  // Radar: avg rubric dimensions
+  const dims = ['academic','financial','leadership','essay'];
+  const avgDims = dims.map(d => AVG(decisions.map(dec=>dec.rubric[d])));
+  mkChart('c-radar','radar',{
+    labels:['Technical','Physical/Med','Mission','Psych'],
+    datasets:[{
+      label:'Avg score (0–25)',
+      data: avgDims.map(v=>+v.toFixed(2)),
+      backgroundColor:'rgba(0,151,178,0.15)', borderColor:'#0097b2', borderWidth:2,
+      pointBackgroundColor:'#0097b2', pointRadius:4
+    }]
+  },{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{r:{beginAtZero:true,max:25,ticks:{stepSize:5,font:{size:10}},pointLabels:{font:{size:11}}}}
+  });
+
+  // Bar: avg score per confidence level
+  const confGroups = groupBy(decisions, d=>d.confidence_level);
+  const confOrder = ['high','medium','low'];
+  mkChart('c-conf-score','bar',{
+    labels:['High confidence','Medium confidence','Low confidence'],
+    datasets:[
+      {label:'Avg score',data:confOrder.map(k=>+(AVG((confGroups[k]||[]).map(d=>d.total_score))).toFixed(1)), backgroundColor:['#1d7a4e','#a05c00','#b52b2b'], borderRadius:4, barPercentage:.5},
+    ]
+  },{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` Avg score: ${c.parsed.y}`}}},
+    scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{beginAtZero:true,max:100,grid:{color:'#f0f2f5'},ticks:{font:{size:11}}}}
+  });
+
+  // Grouped bar: rubric dims per outcome
+  const oc = ['approved','waitlisted','declined'];
+  const ocGroups = groupBy(decisions, d=>d.final_outcome);
+  mkChart('c-dim-outcome','bar',{
+    labels:['Technical','Physical/Med','Mission','Psych'],
+    datasets:oc.map(o=>({
+      label:o.charAt(0).toUpperCase()+o.slice(1),
+      data:dims.map(d=>+(AVG((ocGroups[o]||[]).map(dec=>dec.rubric[d]))).toFixed(1)),
+      backgroundColor:OUTCOME_COLORS[o]+'99', borderColor:OUTCOME_COLORS[o], borderWidth:1.5, borderRadius:3, barPercentage:.28
+    }))
+  },{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{beginAtZero:true,max:25,grid:{color:'#f0f2f5'},ticks:{font:{size:11}}}}
+  });
+  document.getElementById('lg-dim-outcome').innerHTML = oc.map(k=>
+    `<span class="li"><span class="ls" style="background:${OUTCOME_COLORS[k]}"></span>${k.charAt(0).toUpperCase()+k.slice(1)}</span>`).join('');
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// TAB 5 — RISK SIGNALS
+// ════════════════════════════════════════════════════════════════════════
+function renderRiskTab() {
+  const withSig = decisions.filter(d=>d.signals);
+  if (!withSig.length) return;
+  const risks = withSig.map(d=>d.signals.composite_risk);
+  const avgRisk = AVG(risks);
+  const highRisk = withSig.filter(d=>d.signals.composite_risk>0.6).length;
+  const nearCutoff = withSig.filter(d=>d.signals.near_cutoff).length;
+  const mismatch = withSig.filter(d=>d.signals.disagreement_score>0.5).length;
+
+  document.getElementById('kv-risk-avg').textContent    = avgRisk.toFixed(2);
+  document.getElementById('kv-risk-high').textContent   = highRisk;
+  document.getElementById('ks-risk-high').textContent   = PCT(highRisk,withSig.length);
+  document.getElementById('kv-near-cutoff').textContent = nearCutoff;
+  document.getElementById('kv-mismatch').textContent    = mismatch;
+
+  // Bubble scatter: sensitivity vs disagreement, bubble = composite risk
+  const rtColors = Object.fromEntries(ROUTE_KEYS.map(k=>[k,ROUTE_COLORS[k]||'#888']));
+  const byRoute = groupBy(withSig, d=>d.review_type);
+  mkChart('c-risk-bubble','bubble',{
+    datasets: ROUTE_KEYS.filter(k=>byRoute[k]).map(k=>({
+      label:k,
+      data: byRoute[k].map(d=>({ x:+d.signals.sensitivity_score.toFixed(3), y:+d.signals.disagreement_score.toFixed(3), r:Math.max(4,d.signals.composite_risk*18), name:d.name })),
+      backgroundColor: rtColors[k]+'88', borderColor: rtColors[k], borderWidth:1
+    }))
+  },{
+    responsive:true, maintainAspectRatio:false,
+    layout:{padding:{top:10,right:10,bottom:10,left:10}},
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.raw.name} — sens:${c.raw.x.toFixed(2)}, disagr:${c.raw.y.toFixed(2)}, risk:${(c.raw.r/18).toFixed(2)}`}}},
+    scales:{
+      x:{min:-0.05,max:1.05,title:{display:true,text:'Sensitivity score',font:{size:10}},grid:{color:'#f0f2f5'},ticks:{font:{size:10}}},
+      y:{min:-0.05,max:1.05,title:{display:true,text:'Disagreement score',font:{size:10}},grid:{color:'#f0f2f5'},ticks:{font:{size:10}}}
+    }
+  });
+
+  // Bar: avg composite risk per tier
+  const grp = groupBy(withSig, d=>d.review_type);
+  mkChart('c-risk-tier','bar',{
+    labels: ROUTE_KEYS.map(k=>k.replace(' Review','').replace(' Adjudication','')),
+    datasets:[{
+      label:'Avg composite risk',
+      data: ROUTE_KEYS.map(k=>+(AVG((grp[k]||[]).map(d=>d.signals.composite_risk))).toFixed(3)),
+      backgroundColor: ROUTE_KEYS.map(k=>ROUTE_COLORS[k]+'99'), borderColor:ROUTE_KEYS.map(k=>ROUTE_COLORS[k]), borderWidth:1.5, borderRadius:4, barPercentage:.5
+    }]
+  },{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` Avg risk: ${c.parsed.y.toFixed(2)}`}}},
+    scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{beginAtZero:true,max:1,grid:{color:'#f0f2f5'},ticks:{font:{size:10},callback:v=>v.toFixed(1)}}}
+  });
+
+  // Variance histogram
+  const varBins = Array(10).fill(0);
+  withSig.forEach(d=>{ const b=Math.min(9,Math.floor(d.signals.rubric_variance*10)); varBins[b]++; });
+  mkChart('c-variance','bar',{
+    labels:Array.from({length:10},(_,i)=>`${(i*.1).toFixed(1)}–${(i*.1+.1).toFixed(1)}`),
+    datasets:[{label:'Cases', data:varBins, backgroundColor:'#0097b299', borderRadius:2, barPercentage:.8}]
+  },{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{x:{grid:{display:false},ticks:{font:{size:10},maxRotation:45,autoSkip:false}},y:{beginAtZero:true,grid:{color:'#f0f2f5'},ticks:{precision:0,font:{size:10}}}}
+  });
+
+  // Signal flags breakdown
+  const allFlags = withSig.flatMap(d=>[...(d.signals.sensitivity_flags||[]),...(d.signals.disagreement_flags||[])]);
+  const flagCounts = countBy(allFlags, f=>f);
+  const sorted = Object.entries(flagCounts).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const maxF = sorted[0]?.[1]||1;
+  document.getElementById('signal-flags-wrap').innerHTML = sorted.length
+    ? sorted.map(([flag,count])=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <div style="font-size:11px;color:var(--sub);width:220px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${flag}">${flag}</div>
+        <div style="flex:1;background:var(--border);border-radius:2px;height:5px;overflow:hidden"><div style="width:${count/maxF*100}%;height:100%;background:var(--amber);border-radius:2px"></div></div>
+        <div style="font-size:11px;font-weight:600;color:var(--text);width:28px;text-align:right">${count}</div>
+      </div>`).join('')
+    : '<div class="empty-state" style="padding:20px">No signal flags yet</div>';
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// TAB 6 — REVIEWER PERFORMANCE
+// ════════════════════════════════════════════════════════════════════════
+function renderReviewerTab() {
+  const reviewed = decisions.filter(d=>d.human_review);
+  if (!reviewed.length) {
+    ['rv-total','rv-count','rv-drift','rv-maxadj'].forEach(k => {
+      document.getElementById('kv-'+k).textContent='—';
+    });
+    return;
+  }
+  const rvMap = {};
+  reviewed.forEach(d=>{
+    const r = d.human_review.reviewer;
+    if (!rvMap[r]) rvMap[r]={name:r,total:0,agreed:0,adjs:[],cases:[]};
+    rvMap[r].total++;
+    if (d.agreed) rvMap[r].agreed++;
+    rvMap[r].adjs.push(d.human_review.adjustment);
+    rvMap[r].cases.push(d);
+  });
+  const rvList = Object.values(rvMap).map(r=>({...r, agreeRate:r.agreed/r.total, avgAdj:AVG(r.adjs)})).sort((a,b)=>b.total-a.total);
+  const driftFlags = rvList.filter(r=>r.agreeRate<0.6).length;
+  const maxAdjRv = rvList.reduce((best,r)=>Math.abs(r.avgAdj)>Math.abs(best.avgAdj)?r:best,rvList[0]);
+
+  document.getElementById('kv-rv-total').textContent = reviewed.length;
+  document.getElementById('ks-rv-total').textContent = `of ${decisions.length} evaluated`;
+  document.getElementById('kv-rv-count').textContent = rvList.length;
+  document.getElementById('kv-rv-drift').textContent = driftFlags;
+  document.getElementById('kv-rv-maxadj').textContent= maxAdjRv ? (maxAdjRv.avgAdj>=0?'+':'')+maxAdjRv.avgAdj.toFixed(2) : '—';
+  document.getElementById('ks-rv-maxadj').textContent= maxAdjRv ? maxAdjRv.name : '';
+
+  // Horizontal bar: agreement rate per reviewer
+  mkChart('c-rv-agree','bar',{
+    labels: rvList.map(r=>r.name),
+    datasets:[{
+      label:'Agreement rate',
+      data: rvList.map(r=>+(r.agreeRate*100).toFixed(1)),
+      backgroundColor: rvList.map(r=>r.agreeRate>=0.7?'#1d7a4e':r.agreeRate>=0.6?'#a05c00':'#b52b2b'),
+      borderRadius:4, barPercentage:.5
+    }]
+  },{
+    indexAxis:'y',responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.parsed.x.toFixed(1)}% (${rvList[c.dataIndex].agreed}/${rvList[c.dataIndex].total})`}}},
+    scales:{x:{beginAtZero:true,max:100,grid:{color:'#f0f2f5'},ticks:{font:{size:11},callback:v=>v+'%'}},y:{grid:{display:false},ticks:{font:{size:11}}}}
+  });
+
+  // Bar: avg adjustment per reviewer
+  mkChart('c-rv-adj','bar',{
+    labels: rvList.map(r=>r.name),
+    datasets:[{
+      label:'Avg adjustment',
+      data: rvList.map(r=>+r.avgAdj.toFixed(2)),
+      backgroundColor: rvList.map(r=>r.avgAdj>=0?'#0097b299':'#b52b2b99'),
+      borderColor: rvList.map(r=>r.avgAdj>=0?'#0097b2':'#b52b2b'),
+      borderWidth:1.5, borderRadius:4, barPercentage:.5
+    }]
+  },{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.parsed.y>=0?'+':''}${c.parsed.y.toFixed(2)} pts avg`}}},
+    scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{grid:{color:'#f0f2f5'},ticks:{font:{size:11},callback:v=>(v>=0?'+':'')+v.toFixed(1)}}}
+  });
+
+  // Reviewer table
+  document.getElementById('rv-table').innerHTML = rvList.map((r,i)=>{
+    const initials = r.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const drift = r.agreeRate < 0.6;
+    return `<div class="reviewer-row" onclick="drillReviewer('${r.name}')" style="cursor:pointer">
+      <div class="rv-avatar" style="background:${RV_COLORS[i%RV_COLORS.length]}">${initials}</div>
+      <div class="rv-name">${r.name}</div>
+      <div class="rv-stats">
+        <span>${r.total} cases</span>
+        <span>${r.agreed} agreed</span>
+        <span>${r.adjs.map(a=>(a>=0?'+':'')+a.toFixed(1)+'').join(', ').slice(0,30)}</span>
+      </div>
+      <div class="rv-bar-wrap"><div class="rv-bar" style="width:${r.agreeRate*100}%;background:${drift?'#b52b2b':'#1d7a4e'}"></div></div>
+      <div class="rv-pct" style="color:${drift?'#b52b2b':'#1d7a4e'}">${(r.agreeRate*100).toFixed(0)}%</div>
+      <div class="rv-drift ${drift?'warn':'ok'}">${drift?'⚠ Drift':'✓ OK'}</div>
+    </div>`;
+  }).join('');
+}
+
+function drillReviewer(name) {
+  const cases = decisions.filter(d=>d.human_review?.reviewer===name);
+  renderDrillTable(cases, `${name} — ${cases.length} cases`, 'drill-reviewers');
+  document.getElementById('drill-reviewers').classList.remove('hidden');
+  setTimeout(()=>document.getElementById('drill-reviewers').scrollIntoView({behavior:'smooth',block:'nearest'}),50);
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// DRILLDOWN (shared)
+// ════════════════════════════════════════════════════════════════════════
+function drill(filter, tab) {
+  drillFilter[tab] = filter;
+  drillExpanded[tab] = null;
+  const rows = getFilteredRows(filter);
+  const label = filterLabel(filter);
+  renderDrillTable(rows, `${label} — ${rows.length} candidate${rows.length!==1?'s':''}`, 'drill-'+tab);
+  document.getElementById('drill-'+tab).classList.remove('hidden');
+  setTimeout(()=>document.getElementById('drill-'+tab).scrollIntoView({behavior:'smooth',block:'nearest'}),50);
+}
+
+function filterLabel(filter) {
+  const labels = { all:'All candidates', approved:'Approved', waitlisted:'Waitlisted', declined:'Declined',
+    agreed:'Agreed cases', disagreed:'Disagreement cases', 'high-risk':'High-risk cases',
+    'near-cutoff':'Near-cutoff cases', 'evidence-mismatch':'Evidence mismatch cases' };
+  return labels[filter] || filter;
+}
+
+function getFilteredRows(filter) {
+  if (!filter || filter === 'all') return decisions;
+  if (filter === 'disagreed')  return decisions.filter(d=>d.agreed===false);
+  if (filter === 'agreed')     return decisions.filter(d=>d.agreed===true);
+  if (filter === 'high-risk')  return decisions.filter(d=>d.signals?.composite_risk>0.6);
+  if (filter === 'near-cutoff')return decisions.filter(d=>d.signals?.near_cutoff);
+  if (filter === 'evidence-mismatch') return decisions.filter(d=>d.signals?.disagreement_score>0.5);
+  if (['approved','waitlisted','declined'].includes(filter)) return decisions.filter(d=>d.final_outcome===filter);
+  return decisions.filter(d=>d.review_type===filter);
+}
+
+function refreshActiveDrill() {
+  ['funnel','alignment','routing','scores','risk','reviewers'].forEach(tab=>{
+    const f = drillFilter[tab];
+    if (f) {
+      const rows = getFilteredRows(f);
+      renderDrillTable(rows, filterLabel(f)+` — ${rows.length} candidate${rows.length!==1?'s':''}`, 'drill-'+tab);
+    }
+  });
+}
+
+function renderDrillTable(rows, title, containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const tab = containerId.replace('drill-','');
+  const exp = drillExpanded[tab];
+
+  container.innerHTML = `<div class="drilldown">
+    <div class="drill-hdr">
+      <div class="drill-title">${title}</div>
+      <button class="drill-close" onclick="closeDrill('${containerId}')">✕</button>
+    </div>
+    ${rows.length ? `<table class="dt">
+      <thead><tr>
+        <th>Candidate</th><th>Score</th><th>AI rec</th><th>Final</th>
+        <th>Routing</th><th>Confidence</th><th>Risk</th>
+      </tr></thead>
+      <tbody>${rows.map(d=>{
+        const rPct = Math.round((d.signals?.composite_risk||0)*100);
+        const rColor = rPct>60?'#b52b2b':rPct>40?'#a05c00':'#1d7a4e';
+        const isExp = exp===d.app_id;
+        return `<tr class="${isExp?'exp':''}" onclick="toggleDrillRow('${d.app_id}','${tab}')" style="cursor:pointer">
+          <td style="font-weight:500">${d.name}</td>
+          <td><strong>${d.total_score.toFixed(1)}</strong>/100</td>
+          <td><span class="badge b-${d.ai_recommendation}">${d.ai_recommendation}</span></td>
+          <td><span class="badge b-${d.final_outcome}">${d.final_outcome}${d.agreed===false?' ⚑':''}</span></td>
+          <td><span class="badge b-${routingClass(d.review_type)}">${fmtRoute(d.review_type)}</span></td>
+          <td><span class="badge b-${d.confidence_level}">${d.confidence_level}</span></td>
+          <td><span style="color:${rColor};font-weight:600">${rPct}%</span>
+              <span class="risk-bar-wrap"><span class="risk-bar" style="width:${rPct}%;background:${rColor}"></span></span></td>
+        </tr>
+        ${isExp ? `<tr class="xrow"><td colspan="7">
+          <div class="xgrid">
+            ${['academic','financial','leadership','essay'].map(k=>`<div class="xcard">
+              <div class="v">${d.rubric[k].toFixed(1)}<span style="font-size:10px;color:var(--sub)">/25</span></div>
+              <div class="l">${DIM_LABELS[k]}</div>
+              <div class="xbar-wrap"><div class="xbar" style="width:${d.rubric[k]/25*100}%"></div></div>
+            </div>`).join('')}
+          </div>
+          ${d.human_review?`<div style="font-size:12px;color:var(--sub);padding:4px 2px 8px">
+            <strong>Reviewer:</strong> ${d.human_review.reviewer} &nbsp;·&nbsp;
+            <strong>Adjustment:</strong> ${d.human_review.adjustment>=0?'+':''}${d.human_review.adjustment.toFixed(1)} pts
+            ${d.human_review.override?` &nbsp;·&nbsp; <strong>Override:</strong> ${d.human_review.override}`:''}
+          </div>`:''}
+          ${d.signals?`<div style="font-size:11px;color:var(--sub);padding:0 2px 10px;line-height:1.5">${d.signals.routing_rationale}</div>`:''}
+        </td></tr>` : ''}`;
+      }).join('')}</tbody>
+    </table>` : '<div class="empty-state"><div>No candidates match this filter</div></div>'}
+  </div>`;
+}
+
+function toggleDrillRow(id, tab) {
+  drillExpanded[tab] = drillExpanded[tab]===id ? null : id;
+  refreshActiveDrill();
+}
+
+function closeDrill(containerId) {
+  const el = document.getElementById(containerId);
+  if (el) { el.innerHTML=''; el.classList.add('hidden'); }
+  const tab = containerId.replace('drill-','');
+  delete drillFilter[tab];
+  delete drillExpanded[tab];
+}
+
+function routingClass(r) {
+  return {'Auto Decision':'auto','Parallel Review':'parallel','Escalation':'escalation','Senior Adjudication':'senior'}[r]||'auto';
+}
+function fmtRoute(r) {
+  return {'Auto Decision':'Auto','Parallel Review':'Parallel','Escalation':'Escalation','Senior Adjudication':'Senior'}[r]||r;
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// PAST RUNS
+// ════════════════════════════════════════════════════════════════════════
+function loadPastRunsDash() {
+  fetch('/api/results')
+    .then(r => r.json())
+    .then(files => {
+      const sel = document.getElementById('past-runs-sel');
+      if (!sel) return;
+      sel.innerHTML = '<option value="">📁 Load past run…</option>' +
+        files.map(f => {
+          const ts = f.timestamp ? new Date(f.timestamp).toLocaleString() : f.filename;
+          return `<option value="${f.filename}">${ts} · ${f.applicant_count} candidates</option>`;
+        }).join('');
+    })
+    .catch(() => {});
+}
+
+function loadPastRunDash(filename) {
+  if (!filename) return;
+  // Reset the select so it can be re-selected
+  document.getElementById('past-runs-sel').value = '';
+  showStrip('running', '⏳ Loading past run…');
+  fetch('/api/results/' + encodeURIComponent(filename))
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { showStrip('error', data.error); return; }
+      decisions = data.decisions || [];
+      calibration = data.calibration || null;
+      drillFilter = {}; drillExpanded = {};
+      destroyAll();
+      resetKPIs();
+      hideDrills();
+      if (decisions.length) refreshAll();
+      const ts = data.timestamp ? new Date(data.timestamp).toLocaleString() : filename;
+      showStrip('done', `✓ Past run loaded — ${ts} — ${decisions.length} candidates`);
+      // Keep sessionStorage in sync so page reloads preserve the view
+      try {
+        sessionStorage.setItem('dash_d', JSON.stringify(decisions));
+        if (calibration) sessionStorage.setItem('dash_c', JSON.stringify(calibration));
+      } catch(e) {}
+    })
+    .catch(() => showStrip('error', 'Failed to load past run'));
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// UTILS
+// ════════════════════════════════════════════════════════════════════════
+function destroyAll() {
+  Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});
+  Object.keys(charts).forEach(k=>delete charts[k]);
+  document.getElementById('funnel-wrap').innerHTML = '<div class="empty-state"><div class="icon">⏳</div><div>Run evaluation to see funnel</div></div>';
+  ['lg-outcome','lg-routing1','score-stats','lg-routing-stats','lg-routing-outcome','lg-dim-outcome','lg-flip','cal-insights','disagr-table','rv-table','signal-flags-wrap'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.innerHTML='';
+  });
+}
+</script>
+</body>
+</html>

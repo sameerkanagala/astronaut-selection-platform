@@ -1,0 +1,18 @@
+{
+  "id": "IEA-007",
+  "name": "Yuki Tanaka",
+  "age": 36,
+  "nationality": "Japanese",
+  "stem_field": "Materials Science & Structural Engineering",
+  "candidate_level": "Group 7 Candidate",
+  "military_background": false,
+  "flight_hours": 590,
+  "advanced_degrees": 2,
+  "physical_fitness_score": 83.0,
+  "medical_clearance": "Full",
+  "specializations": ["Structural Analysis", "EVA Operations"],
+  "prior_missions": 0,
+  "awards": ["JAXA Technical Excellence Award"],
+  "personal_statement": "I have spent eight years designing materials that fail gracefully — that absorb damage and maintain structural integrity at the margins of tolerance. I think about systems at the point where they break. That mindset is, I believe, exactly what is needed in a mission environment where there is no maintenance depot and no second chance. I am also completing an accelerated flight programme and expect to reach 1,000 hours within 14 months.",
+  "psychological_profile": "Methodical, precise, and deeply knowledgeable in structural failure analysis. Simulation performance strong in technical scenarios. Flight hours are below mission threshold but candidate is actively addressing this. Psychological profile: calm, steady, low emotional volatility under sustained pressure."
+}

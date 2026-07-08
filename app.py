@@ -1,14 +1,30 @@
 """
 Astronaut Candidate Selection Platform — Flask Web Application
-Uses a background-thread + polling architecture for reliable delivery
-on any proxy/CDN (Railway, Heroku, etc.) without SSE buffering issues.
+================================================================
+Background-thread + polling architecture (no SSE, avoids proxy buffering
+on Railway/Heroku). Three run modes:
+
+  Stub Demo       — pure heuristic simulation. No AWS calls of any kind.
+  Redaction Only  — real Amazon Bedrock Guardrails redaction (stage 0),
+                    then the same free stub heuristics for scoring. No
+                    Claude call, no Anthropic API key needed.
+  Live Claude     — real Bedrock Guardrails redaction, then real Claude
+                    calls via the direct Anthropic API using a
+                    user-supplied API key (unchanged from before).
+
+Applications and results are stored in a real AWS S3 bucket dedicated to
+this project (data_loader.py), with a local applications/results folder
+fallback for development.
 
 Flow:
   POST /api/evaluate  → starts background job, returns {job_id}
   GET  /api/poll/<id> → returns new events since last poll (drain queue)
   GET  /api/presets   → returns program policy presets
   GET  /api/applications → returns applicant list
+  GET  /api/results   → list persisted result files
+  GET  /api/results/<filename> → load a specific past run
 """
+import copy
 import json
 import os
 import traceback
@@ -17,11 +33,20 @@ import uuid
 from collections import deque
 from flask import Flask, render_template, request, jsonify, send_from_directory
 
-from scholarship_eval.mock_data import APPLICATIONS
+import data_loader
 from scholarship_eval.models   import DecisionOutcome, ReviewType
 from scholarship_eval.policy   import PRESETS, policy_from_dict, policy_to_dict
 
 app = Flask(__name__)
+
+REGION = os.environ.get("AWS_REGION", "us-east-1")
+
+# Set ALLOW_LIVE_MODE=false on a public deployment to hide Live Claude mode
+# from the UI and reject it server-side, so visitors are never invited to
+# paste their own Anthropic API key into an unfamiliar public site. Stub
+# Demo and Redaction Only are unaffected — neither needs a visitor-supplied
+# key. Leave unset (default: enabled) for local/private use.
+LIVE_MODE_ENABLED = os.environ.get("ALLOW_LIVE_MODE", "true").strip().lower() != "false"
 
 # ── In-memory job store ───────────────────────────────────────────────────────
 # { job_id: { "status": "running"|"done"|"error", "queue": deque, "lock": Lock } }
@@ -65,6 +90,8 @@ def _drain(job_id: str) -> tuple[str, list]:
 def decision_to_dict(decision) -> dict:
     sc = decision.scoring
     hr = decision.human_review
+    rr = getattr(decision, "redaction_report", None)
+    redacted_app = getattr(decision, "redacted_application", None)
     return {
         "app_id":            decision.application_id,
         "name":              decision.applicant_name,
@@ -115,6 +142,24 @@ def decision_to_dict(decision) -> dict:
              "timestamp": s.timestamp, "metadata": s.metadata}
             for s in decision.audit_trail
         ],
+        # Only populated in Redaction Only / Live Claude modes (Stub Demo
+        # never touches Bedrock, so this is None there — templates/index.html's
+        # Redaction tab checks for that and explains why).
+        "redaction": {
+            "entity_counts": rr.entity_counts(),
+            "blocked_fields": rr.blocked_fields(),
+            "guardrail_intervened": rr.guardrail_intervened,
+            "findings": [
+                {"field": f.field, "type": f.type, "action": f.action, "match": f.match}
+                for f in rr.findings
+            ],
+            "redacted_fields": {
+                "personal_statement": redacted_app.personal_statement,
+                "psychological_profile": redacted_app.psychological_profile,
+                "specializations": redacted_app.specializations,
+                "awards": redacted_app.awards,
+            } if redacted_app else None,
+        } if rr else None,
     }
 
 
@@ -140,18 +185,75 @@ def calibration_to_dict(report) -> dict:
 
 # ── Background worker ─────────────────────────────────────────────────────────
 
-def _run_job(job_id: str, mode: str, api_key: str, model: str,
-             selected: list, policy):
+def _build_live_orchestrator(api_key: str, model: str):
+    """Constructed lazily, only when a "live" job actually runs — Stub Demo
+    and Redaction Only must work without an Anthropic API key configured."""
+    from anthropic import Anthropic
+    from scholarship_eval.orchestrator import Orchestrator
+    from pii_redaction import PIIRedactor
+
+    guardrail_id = os.environ["GUARDRAIL_ID"]
+    guardrail_version = os.environ["GUARDRAIL_VERSION"]
+    client = Anthropic(api_key=api_key)
+    redactor = PIIRedactor(guardrail_id=guardrail_id, guardrail_version=guardrail_version, region=REGION)
+    return Orchestrator(client=client, model=model, redactor=redactor, verbose=False)
+
+
+def _build_redaction_only_orchestrator():
+    """Constructed lazily, same reasoning as _build_live_orchestrator. Only
+    needs GUARDRAIL_ID/GUARDRAIL_VERSION/AWS credentials — no Anthropic API
+    key, since this mode never calls Claude."""
+    from redaction_only_orchestrator import RedactionOnlyOrchestrator
+    from pii_redaction import PIIRedactor
+
+    guardrail_id = os.environ["GUARDRAIL_ID"]
+    guardrail_version = os.environ["GUARDRAIL_VERSION"]
+    redactor = PIIRedactor(guardrail_id=guardrail_id, guardrail_version=guardrail_version, region=REGION)
+    return RedactionOnlyOrchestrator(redactor=redactor, verbose=False)
+
+
+def _run_job(job_id: str, mode: str, api_key: str, model: str, selected: list, policy):
+    decision_dicts = []
     try:
         if mode == "live":
             if not api_key:
-                _push(job_id, "error", message="API key required for live mode.")
+                _push(job_id, "error", message="Anthropic API key required for Live Claude mode.")
+                with _jobs_lock:
+                    if job_id in _jobs:
+                        _jobs[job_id]["status"] = "error"
                 return
-            from anthropic import Anthropic
-            from scholarship_eval.orchestrator import Orchestrator
-            client       = Anthropic(api_key=api_key)
-            orchestrator = Orchestrator(client=client, model=model,
-                                        policy=policy, verbose=False)
+            try:
+                orchestrator = _build_live_orchestrator(api_key, model)
+                orchestrator.policy = policy
+                orchestrator.scoring_agent.high_threshold = policy.confidence_high
+                orchestrator.scoring_agent.low_threshold = policy.confidence_low
+            except KeyError as missing:
+                _push(job_id, "error",
+                      message=f"Live mode is missing required server configuration: {missing}. "
+                              f"GUARDRAIL_ID / GUARDRAIL_VERSION / AWS credentials must be set as "
+                              f"environment variables on this service (redaction runs on the server's "
+                              f"AWS credentials, separately from your Anthropic API key).")
+                with _jobs_lock:
+                    if job_id in _jobs:
+                        _jobs[job_id]["status"] = "error"
+                return
+        elif mode == "redaction_only":
+            try:
+                orchestrator = _build_redaction_only_orchestrator()
+                orchestrator.policy = policy
+                orchestrator.scoring_agent.high_threshold = policy.confidence_high
+                orchestrator.scoring_agent.low_threshold = policy.confidence_low
+                orchestrator.scoring_agent.quant_weight = getattr(policy, "quant_weight", 0.50)
+            except KeyError as missing:
+                _push(job_id, "error",
+                      message=f"Redaction Only mode is missing required server configuration: {missing}. "
+                              f"GUARDRAIL_ID / GUARDRAIL_VERSION / AWS credentials must be set as "
+                              f"environment variables on this service (no Anthropic API key needed "
+                              f"for this mode).")
+                with _jobs_lock:
+                    if job_id in _jobs:
+                        _jobs[job_id]["status"] = "error"
+                return
         else:
             from scholarship_eval.stub_agents import StubOrchestrator
             orchestrator = StubOrchestrator(verbose=False, policy=policy)
@@ -166,14 +268,20 @@ def _run_job(job_id: str, mode: str, api_key: str, model: str,
 
             decision = orchestrator.evaluate(application)
             decisions.append(decision)
+            d = decision_to_dict(decision)
+            decision_dicts.append(d)
 
-            _push(job_id, "result",
-                  index=i + 1, total=len(selected),
-                  decision=decision_to_dict(decision))
+            _push(job_id, "result", index=i + 1, total=len(selected), decision=d)
 
         from scholarship_eval.calibration import CalibrationSystem
         report = CalibrationSystem().analyse(decisions)
-        _push(job_id, "calibration", report=calibration_to_dict(report))
+        calib_dict = calibration_to_dict(report)
+        _push(job_id, "calibration", report=calib_dict)
+
+        # ── Persist results (real S3 in production, local results/ in dev) ──
+        filename = data_loader.save_results(job_id, decision_dicts, calib_dict)
+        _push(job_id, "saved", filename=filename)
+
         _push(job_id, "done")
 
         with _jobs_lock:
@@ -198,12 +306,20 @@ def index():
 def health():
     return jsonify({"status": "ok"})
 
+
 @app.route("/about")
 def about():
     return send_from_directory('static', 'about.html')
 
+
+@app.route("/dashboard")
+def dashboard():
+    return render_template("dashboard.html")
+
+
 @app.route("/api/applications")
 def list_applications():
+    apps = data_loader.load_applications()
     return jsonify([
         {"id": a.id, "name": a.name, "age": a.age,
          "nationality": a.nationality,
@@ -216,13 +332,20 @@ def list_applications():
          "awards": a.awards,
          "personal_statement": a.personal_statement,
          "psychological_profile": a.psychological_profile}
-        for a in APPLICATIONS
+        for a in apps
     ])
 
 
 @app.route("/api/presets")
 def get_presets():
     return jsonify({k: policy_to_dict(v) for k, v in PRESETS.items()})
+
+
+@app.route("/api/config")
+def get_config():
+    """Frontend feature flags. Currently just whether Live Claude mode
+    (visitor-supplied Anthropic API key) is exposed on this deployment."""
+    return jsonify({"live_mode_enabled": LIVE_MODE_ENABLED})
 
 
 @app.route("/api/evaluate", methods=["POST"])
@@ -232,26 +355,31 @@ def evaluate():
     mode    = body.get("mode", "stub")
     api_key = body.get("api_key", "").strip()
     model   = body.get("model", "claude-haiku-4-5-20251001")
-    app_ids = body.get("app_ids", [a.id for a in APPLICATIONS])
+    app_ids = body.get("app_ids", None)  # None = all applications
+
+    if mode == "live" and not LIVE_MODE_ENABLED:
+        return jsonify({"error": "Live Claude mode is disabled on this deployment. "
+                                  "Run the app locally with your own Anthropic API key "
+                                  "to use it."}), 403
 
     # Build policy
     policy_data = body.get("policy", {})
     preset_key  = policy_data.get("program_type", "initial_screening")
-    import copy
     if preset_key in PRESETS:
         policy = copy.deepcopy(PRESETS[preset_key])
         for k, v in policy_data.items():
             if hasattr(policy, k) and k not in ("program_name", "program_type", "description"):
                 try: setattr(policy, k, type(getattr(policy, k))(v))
-                except: pass
+                except Exception: pass
     else:
         policy = policy_from_dict(policy_data)
 
-    app_map  = {a.id: a for a in APPLICATIONS}
-    selected = [app_map[aid] for aid in app_ids if aid in app_map]
+    selected = data_loader.load_applications(app_ids)
 
     if not selected:
-        return jsonify({"error": "No valid application IDs provided"}), 400
+        return jsonify({"error": "No applications found. Add applications/*.json files "
+                                 "(local dev) or upload them to the S3 bucket's "
+                                 "applications/ prefix."}), 400
 
     job_id = _new_job()
     t = threading.Thread(
@@ -273,8 +401,25 @@ def poll(job_id):
     return jsonify({"status": status, "events": events})
 
 
+@app.route("/api/results")
+def list_results():
+    return jsonify(data_loader.list_results())
+
+
+@app.route("/api/results/<path:filename>")
+def get_result(filename):
+    try:
+        data = data_loader.load_result(filename)
+        return jsonify(data)
+    except FileNotFoundError:
+        return jsonify({"error": "Result file not found"}), 404
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
+    print(f"[app] Storage mode: {data_loader.storage_mode()}")
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)

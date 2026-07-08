@@ -1,0 +1,18 @@
+{
+  "id": "IEA-009",
+  "name": "Dr. Aisha Nkosi",
+  "age": 40,
+  "nationality": "South African",
+  "stem_field": "Neuroscience & Cognitive Systems",
+  "candidate_level": "Group 7 Candidate",
+  "military_background": false,
+  "flight_hours": 145,
+  "advanced_degrees": 2,
+  "physical_fitness_score": 76.0,
+  "medical_clearance": "Full",
+  "specializations": ["Human Factors", "Cognitive Performance Monitoring"],
+  "prior_missions": 1,
+  "awards": ["South African Science and Technology Award", "IEA Payload Specialist Commendation"],
+  "personal_statement": "My prior mission as payload specialist taught me that the difference between a good crew and a great crew is not technical — it is cognitive. I study how human decision-making degrades under isolation, fatigue, and high stakes, and I know how to design interventions that preserve it. I am applying for a mission role because I want to apply that science from inside the system, not from a control room 400 kilometres below it.",
+  "psychological_profile": "Unique profile: low flight hours but genuine prior mission experience as payload specialist. Cognitive performance research background adds rare crew-level value. Psychological assessment scores in the 91st percentile. Flight hours remain the primary gap for a mission-critical seat; strong candidate for science crew roles."
+}

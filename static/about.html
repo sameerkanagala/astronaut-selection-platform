@@ -9,13 +9,13 @@
 <meta property="og:type"        content="website">
 <meta property="og:url"         content="https://astronaut.leadng.app/about">
 <meta property="og:title"       content="Astronaut Candidate Selection Platform">
-<meta property="og:description" content="A complete agentic AI evaluation pipeline: multi-agent analysis, policy-driven routing, human-AI collaboration, and calibration — built by Sameer Kanagala.">
+<meta property="og:description" content="A complete agentic AI evaluation pipeline: PII redaction via Amazon Bedrock Guardrails, multi-agent analysis, policy-driven routing, human-AI collaboration, and calibration — built by Sameer Kanagala.">
 <meta property="og:site_name"   content="Astronaut Selection Platform">
 
 <!-- Twitter Card (LinkedIn also reads these) -->
 <meta name="twitter:card"        content="summary_large_image">
 <meta name="twitter:title"       content="Astronaut Candidate Selection Platform">
-<meta name="twitter:description" content="A complete agentic AI evaluation pipeline: multi-agent analysis, policy-driven routing, human-AI collaboration, and calibration — built by Sameer Kanagala.">
+<meta name="twitter:description" content="A complete agentic AI evaluation pipeline: PII redaction via Amazon Bedrock Guardrails, multi-agent analysis, policy-driven routing, human-AI collaboration, and calibration — built by Sameer Kanagala.">
 <meta name="twitter:card"        content="summary">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -244,7 +244,7 @@ footer a { color: #5baee8; text-decoration: none; }
 <section class="hero">
   <div class="hero-badge">IEA Group 7 Selection Platform · Agentic AI Portfolio · Sameer Kanagala</div>
   <h1>AI that knows when to<br><span>call a human</span></h1>
-  <p>A complete agentic evaluation pipeline: multi-agent analysis, policy-driven routing, human-AI collaboration, and calibration — in one system.</p>
+  <p>A complete agentic evaluation pipeline: multi-agent analysis, policy-driven routing, human-AI collaboration, and calibration — in one system. Every candidate's personal data is now redacted through Amazon Bedrock Guardrails before it reaches a model.</p>
   <div class="hero-btns">
     <a class="btn-primary" href="https://astronaut.leadng.app/" target="_blank" rel="noopener">Launch Live Demo →</a>
     <a class="btn-secondary" href="#architecture">Explore Architecture ↓</a>
@@ -260,10 +260,17 @@ footer a { color: #5baee8; text-decoration: none; }
 <!-- ARCHITECTURE -->
 <section class="section" id="architecture">
   <div class="section-label">Architecture</div>
-  <h2>Four agents. One typed pipeline.</h2>
-  <p class="section-intro">Each application passes through four agents in sequence. Each agent has a single responsibility and hands a typed artefact to the next. No agent touches implementation details outside its stage.</p>
+  <h2>Redacted first. Then four agents. One typed pipeline.</h2>
+  <p class="section-intro">Astronauts have PII too. Before any agent — AI or human — sees a candidate's personal statement, psychological profile, specializations, or awards, those fields now pass through Amazon Bedrock Guardrails and come back de-identified. Only then does the application move through four agents in sequence, each with a single responsibility, each handing a typed artefact to the next.</p>
 
   <div class="pipeline">
+    <div class="pipeline-step">
+      <div class="step-num" style="background:#7a2048"><div class="num">0</div>Redaction</div>
+      <div class="step-body">
+        <div class="step-name">PII Redaction — Amazon Bedrock Guardrails</div>
+        <div class="step-desc">Runs once per candidate, before anything else. Names, locations, and other identifying details are detected and masked or blocked by a real Bedrock Guardrails call. Every downstream stage — Analysis, Scoring, and Human Review — operates on this de-identified view. The candidate's real name is only reattached to the final decision record for admin display; it is never sent to a model.</div>
+      </div>
+    </div>
     <div class="pipeline-step">
       <div class="step-num" style="background:#1a375e"><div class="num">1</div>Analysis</div>
       <div class="step-body">
@@ -491,9 +498,9 @@ footer a { color: #5baee8; text-decoration: none; }
     <div class="ctrl">
       <div class="ctrl-label">
         <h4>Mode</h4>
-        <div class="ctrl-range">Stub / Live</div>
+        <div class="ctrl-range">Stub / Redaction Only / Live</div>
       </div>
-      <div class="ctrl-desc">Stub: deterministic agents, no API key, fast and reproducible. Live: real Claude API calls, genuine LLM reasoning. Architecture identical in both modes — only the agent implementation changes.</div>
+      <div class="ctrl-desc">Stub: deterministic agents, no AWS or API calls, fast and reproducible. Redaction Only: a genuine Amazon Bedrock Guardrails call de-identifies each candidate, but scoring still uses the free heuristic — no model cost. Live: real Bedrock Guardrails redaction, then a real Claude call for scoring. Architecture identical across all three — only what actually gets called changes.</div>
     </div>
   </div>
 </section>

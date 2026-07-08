@@ -1,0 +1,18 @@
+{
+  "id": "IEA-010",
+  "name": "Rachel Kim",
+  "age": 33,
+  "nationality": "Korean-American",
+  "stem_field": "Systems Engineering & Computer Science",
+  "candidate_level": "Group 7 Candidate",
+  "military_background": true,
+  "flight_hours": 1120,
+  "advanced_degrees": 1,
+  "physical_fitness_score": 86.0,
+  "medical_clearance": "Full",
+  "specializations": ["Flight Software", "Systems Integration", "Navigation"],
+  "prior_missions": 0,
+  "awards": ["Air Force Achievement Medal"],
+  "personal_statement": "I spent four years writing the flight software that keeps aircraft stable when the pilot cannot. Then I flew those aircraft to understand what I had built from the other side of the glass. I think in systems — how components interact, where dependencies create fragility, and how to design resilience into architectures that cannot be patched mid-flight. That is exactly the mindset a spacecraft needs.",
+  "psychological_profile": "Technically strong, growth-oriented mindset. Scores well on adaptive reasoning tasks. Personal statement is clear and grounded — does not oversell. Physical and technical credentials are solid for this stage. A well-rounded candidate at the early career point of the experience curve."
+}

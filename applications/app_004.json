@@ -1,0 +1,18 @@
+{
+  "id": "IEA-004",
+  "name": "James Okafor",
+  "age": 38,
+  "nationality": "Nigerian-American",
+  "stem_field": "Robotics & Systems Engineering",
+  "candidate_level": "Group 7 Candidate",
+  "military_background": true,
+  "flight_hours": 1650,
+  "advanced_degrees": 1,
+  "physical_fitness_score": 88.0,
+  "medical_clearance": "Full",
+  "specializations": ["Robotic Arm Operations", "EVA Operations", "Systems Repair"],
+  "prior_missions": 0,
+  "awards": ["Air Force Commendation Medal", "IEEE Young Engineer Award"],
+  "personal_statement": "I spent six years maintaining and piloting aircraft in environments where a mechanical fault meant lives lost, and five years after that building the robotic systems that inspect the places humans cannot safely reach. I have spent my career solving problems at the boundary of human and machine capability. That boundary is exactly where space operations live.",
+  "psychological_profile": "Technically confident, methodical under pressure. Excels in structured problem-solving scenarios. Leadership scores above cohort average. Adapts well to ambiguity when given initial parameters. Recommended for technical mission roles."
+}

@@ -309,6 +309,21 @@
     .always-section { border-top:1px solid rgba(255,255,255,.10);
                       margin-top:4px; padding-top:10px; }
 
+    /* ── Past Runs ───────────────────────────────────────────── */
+    .past-runs-list { max-height: 180px; overflow-y: auto; }
+    .past-runs-list::-webkit-scrollbar { width: 4px; }
+    .past-runs-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,.2); border-radius: 2px; }
+    .past-run-item { display:flex; flex-direction:column; gap:1px; width:100%; text-align:left;
+                     padding:6px 8px; margin-bottom:4px; border-radius:6px;
+                     border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.04);
+                     cursor:pointer; transition:background .15s, border-color .15s; }
+    .past-run-item:hover { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.15); }
+    .past-run-item.active { background: rgba(46,117,182,.25); border-color: rgba(46,117,182,.7); }
+    .past-run-name { font-size: 11px; font-weight: 600; color: #c8d8ea;
+                     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .past-run-meta { font-size: 10px; color: #6a8fb0; }
+    .past-runs-empty { font-size: 11px; color: #5a85a8; text-align: center; padding: 8px 0; }
+
     /* ── Utility ──────────────────────────────────────────────── */
     .hidden { display: none !important; }
     .spinner { display: inline-block; width: 14px; height: 14px;
@@ -362,13 +377,21 @@
       <div class="field">
         <label>Run Mode</label>
         <div class="toggle-row">
-          <button class="toggle-btn active" id="btn-stub" onclick="setMode('stub')">Stub Demo</button>
-          <button class="toggle-btn"        id="btn-live" onclick="setMode('live')">Live Claude</button>
+          <button class="toggle-btn active" id="btn-stub"      onclick="setMode('stub')">Stub Demo</button>
+          <button class="toggle-btn"        id="btn-redaction" onclick="setMode('redaction_only')">Redaction Only</button>
+          <button class="toggle-btn"        id="btn-live"      onclick="setMode('live')">Live Claude</button>
         </div>
+        <small id="mode-desc" style="font-size:10px;color:#6a9bbf;line-height:1.5;display:block;margin-top:6px">
+          Pure heuristic simulation — zero AWS calls, instant, free.
+        </small>
       </div>
       <div class="field hidden" id="apikey-field">
         <label>Anthropic API Key</label>
         <input type="password" id="api-key" placeholder="sk-ant-api03-…">
+        <small style="font-size:10px;color:#6a9bbf;line-height:1.5;display:block;margin-top:6px">
+          Only this key is sent to Anthropic directly. PII redaction (stage 0) runs separately,
+          on this server's own AWS credentials via Amazon Bedrock Guardrails.
+        </small>
       </div>
       <div class="field hidden" id="model-field">
         <label>Model</label>
@@ -571,6 +594,22 @@
         </div>
       </div>
 
+      <!-- ── 7. Past Runs ────────────────────────────────────────── -->
+      <div class="acc" id="acc-pastruns">
+        <button class="acc-hdr" onclick="openAcc('pastruns')">
+          <span>📁 Past Runs</span><span class="acc-chev">▾</span>
+        </button>
+        <div class="acc-body">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <span style="font-size:10px;color:#6a9bbf">Click a run to reload it</span>
+            <button onclick="loadPastRuns()" style="background:none;border:none;color:#5a9fd4;font-size:12px;cursor:pointer;padding:0" title="Refresh list">↻</button>
+          </div>
+          <div class="past-runs-list" id="past-runs-list">
+            <div class="past-runs-empty">No past runs yet</div>
+          </div>
+        </div>
+      </div>
+
       <!-- ── Always visible: Candidates + Run ──────────────────── -->
       <div class="always-section">
         <div class="field">
@@ -602,6 +641,12 @@
         <div class="status-dot"></div>
         <span id="status-text">Ready</span>
       </div>
+      <a href="/dashboard" target="_blank" style="margin-left:12px;padding:5px 12px;
+        background:#0097b2;color:#fff;border-radius:5px;font-size:12px;font-weight:600;
+        text-decoration:none;white-space:nowrap">📊 Funnel Dashboard</a>
+      <a href="/about" target="_blank" style="margin-left:8px;padding:5px 12px;
+        background:transparent;color:var(--navy);border:1px solid var(--border);border-radius:5px;
+        font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap">ℹ️ About</a>
     </div>
 
     <div class="content" id="content">
@@ -679,6 +724,17 @@ let awardSensitivity = 'low';
 document.addEventListener('DOMContentLoaded', () => {
   fetch('/api/applications').then(r=>r.json()).then(apps => { allApps=apps; renderAppList(apps); });
   fetch('/api/presets').then(r=>r.json()).then(p => { presets=p; });
+  fetch('/api/config').then(r=>r.json()).then(cfg => {
+    if (!cfg.live_mode_enabled) {
+      const liveBtn = document.getElementById('btn-live');
+      if (liveBtn) {
+        liveBtn.classList.add('hidden');
+        liveBtn.title = 'Live Claude mode is disabled on this public deployment.';
+      }
+      if (mode === 'live') setMode('stub');
+    }
+  }).catch(() => {});
+  loadPastRuns();
 
   // Mobile: collapse all accordions so candidates + Run button are immediately visible
   if (window.innerWidth <= 768) {
@@ -718,12 +774,21 @@ function updateQuantWeight(val) {
 }
 
 // ── Mode ──────────────────────────────────────────────────────────────────────
+const MODE_DESCRIPTIONS = {
+  stub: 'Pure heuristic simulation — zero AWS calls, instant, free.',
+  redaction_only: 'Real Amazon Bedrock Guardrails redaction (genuine AWS call, provable in the Redaction tab) — scoring still uses the free heuristic logic. No Claude call, no model cost.',
+  live: 'Real Bedrock Guardrails redaction, then real Claude scoring via your Anthropic API key.',
+};
+
 function setMode(m) {
   mode = m;
   document.getElementById('btn-stub').classList.toggle('active', m === 'stub');
+  document.getElementById('btn-redaction').classList.toggle('active', m === 'redaction_only');
   document.getElementById('btn-live').classList.toggle('active', m === 'live');
   document.getElementById('apikey-field').classList.toggle('hidden', m !== 'live');
   document.getElementById('model-field').classList.toggle('hidden', m !== 'live');
+  const desc = document.getElementById('mode-desc');
+  if (desc) desc.textContent = MODE_DESCRIPTIONS[m] || '';
 }
 
 function setAwardSens(val, btn) {
@@ -891,12 +956,17 @@ function handleEvent(ev) {
       break;
     case 'calibration':
       renderCalibration(ev.report);
+      try { sessionStorage.setItem('dash_c', JSON.stringify(ev.report)); } catch(e) {}
       break;
     case 'done':
       setStatus('done', `Done — ${decisions.length} evaluated`);
       setRunBtn(false);
       document.getElementById('topbar-sub').textContent =
         `${decisions.length} candidates evaluated`;
+      try {
+        sessionStorage.setItem('dash_d', JSON.stringify(decisions));
+      } catch(e) {}
+      loadPastRuns();
       break;
     case 'error':
       setStatus('error', 'Error occurred');
@@ -1134,20 +1204,150 @@ function buildAuditPanel(d) {
   const qw = getPolicy ? getPolicy().quant_weight : 0.50;
   const rubricTab = buildRubricTab(d, qw);
 
+  // ── Tab: Redaction ──────────────────────────────────────────────
+  const redactionTab = buildRedactionTab(d, appData);
+
   return `<div class="audit-panel">
     <div class="tab-bar">
       <button class="tab-btn active" onclick="switchTab('${uid}','app',this)">📋 Application</button>
+      <button class="tab-btn"        onclick="switchTab('${uid}','redaction',this)">🔒 Redaction</button>
       <button class="tab-btn"        onclick="switchTab('${uid}','rubric',this)">📐 Rubric</button>
       <button class="tab-btn"        onclick="switchTab('${uid}','scores',this)">📊 Scores</button>
       <button class="tab-btn"        onclick="switchTab('${uid}','signals',this)">⚡ Signals</button>
       <button class="tab-btn"        onclick="switchTab('${uid}','trail',this)">🔍 Audit</button>
     </div>
     <div class="tab-pane active" id="tab-${uid}-app">${appTab}</div>
+    <div class="tab-pane"        id="tab-${uid}-redaction">${redactionTab}</div>
     <div class="tab-pane"        id="tab-${uid}-rubric">${rubricTab}</div>
     <div class="tab-pane"        id="tab-${uid}-scores">${scoresTab}</div>
     <div class="tab-pane"        id="tab-${uid}-signals">${sigTab}</div>
     <div class="tab-pane"        id="tab-${uid}-trail">${steps}</div>
   </div>`;
+}
+
+function escapeHtml(s) {
+  return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// Highlights raw PII substrings (in red) inside the ORIGINAL, unredacted text.
+function highlightOriginal(text, matches) {
+  let escaped = escapeHtml(text);
+  const uniq = [...new Set((matches || []).filter(Boolean))].sort((a, b) => b.length - a.length);
+  uniq.forEach(m => {
+    const esc = escapeHtml(m);
+    if (esc) escaped = escaped.split(esc).join(`<mark style="background:#fde2e1;color:var(--red);border-radius:3px;padding:0 3px;font-weight:600">${esc}</mark>`);
+  });
+  return escaped;
+}
+
+// Highlights {ENTITY_TYPE} placeholders (in green) inside the REDACTED text
+// that actually reached the scoring / Claude stage.
+function highlightRedacted(text) {
+  return escapeHtml(text).replace(/(\{[A-Z_]+\})/g,
+    '<mark style="background:#e1f5ea;color:var(--green);border-radius:3px;padding:0 3px;font-weight:600">$1</mark>');
+}
+
+function buildRedactionTab(d, appData) {
+  const r = d.redaction;
+
+  // `undefined` = the API response has no "redaction" key at all — an older
+  // deployment or a Past Run saved before this feature existed. `null` means
+  // this build is current and Stub Demo simply doesn't run redaction.
+  if (typeof d.redaction === 'undefined') {
+    return `<div class="empty-state" style="padding:32px 16px">
+      <div class="icon" style="font-size:28px;opacity:.4">⚠️</div>
+      <p style="max-width:460px;line-height:1.6">
+        <strong>This result has no redaction data at all — including a mode field.</strong><br>
+        That means it was produced by a deployment older than this Redaction tab
+        (or a Past Run saved before it existed), not that redaction failed to run.
+        Redeploy the latest build and run a fresh evaluation to check.
+      </p>
+    </div>`;
+  }
+
+  if (r === null) {
+    return `<div class="empty-state" style="padding:32px 16px">
+      <div class="icon" style="font-size:28px;opacity:.4">🔓</div>
+      <p style="max-width:440px;line-height:1.6">
+        <strong>Stub Demo mode doesn't perform PII redaction.</strong><br>
+        No AWS or Bedrock calls happen in this mode — it's a pure heuristic simulation.
+        Switch to <strong>Redaction Only</strong> in the sidebar and re-run to see this
+        candidate's personal statement, psychological profile, specializations, and awards
+        actually redacted by real Amazon Bedrock Guardrails calls — no Claude call required
+        for that mode.
+      </p>
+    </div>`;
+  }
+
+  const entityTags = Object.keys(r.entity_counts || {}).length
+    ? Object.entries(r.entity_counts).map(([t, c]) =>
+        `<span class="tag" style="background:#eef4fb;color:var(--blue)">${escapeHtml(t)} × ${c}</span>`).join('')
+    : '<span class="tag">No entities detected</span>';
+
+  const blockedTags = (r.blocked_fields || []).map(f =>
+    `<span class="tag" style="background:#ffebee;color:var(--red);font-weight:700">🚫 BLOCKED: ${escapeHtml(f)}</span>`).join('');
+
+  const textFields = [
+    { key: 'personal_statement',     label: 'Personal Statement' },
+    { key: 'psychological_profile',  label: 'Psychological Profile (Evaluator)' },
+  ];
+  const listFields = [
+    { key: 'specializations', label: 'Mission Specializations' },
+    { key: 'awards',          label: 'Awards & Honours' },
+  ];
+
+  const textRows = textFields.filter(f => appData[f.key]).map(f => {
+    const matches = (r.findings || []).filter(x => x.field === f.key).map(x => x.match);
+    const isBlocked = (r.blocked_fields || []).includes(f.key);
+    const redactedVal = r.redacted_fields ? r.redacted_fields[f.key] : '';
+    return `<div class="app-field" style="margin-bottom:16px">
+      <div class="app-field-label">${f.label}${isBlocked ? ' <span style="color:var(--red)">— BLOCKED (guardrail intervened)</span>' : ''}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div style="background:#fff9f8;border:1px solid #f3c6c2;border-radius:7px;padding:10px 12px;font-size:12px;line-height:1.6">
+          <div style="font-size:10px;font-weight:700;color:var(--red);text-transform:uppercase;margin-bottom:4px">Before — raw text</div>
+          ${highlightOriginal(appData[f.key], matches)}
+        </div>
+        <div style="background:#f7fdf9;border:1px solid #b9e3cb;border-radius:7px;padding:10px 12px;font-size:12px;line-height:1.6">
+          <div style="font-size:10px;font-weight:700;color:var(--green);text-transform:uppercase;margin-bottom:4px">After — what the pipeline saw</div>
+          ${isBlocked ? '<em style="color:var(--red)">Field blocked entirely — never sent downstream.</em>' : highlightRedacted(redactedVal || '')}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const listRows = listFields.filter(f => (appData[f.key] || []).length).map(f => {
+    const originalList = appData[f.key] || [];
+    const redactedList = (r.redacted_fields && r.redacted_fields[f.key]) || originalList;
+    const matches = (r.findings || []).filter(x => x.field === f.key).map(x => x.match);
+    const isBlocked = (r.blocked_fields || []).includes(f.key);
+    return `<div class="app-field" style="margin-bottom:16px">
+      <div class="app-field-label">${f.label}${isBlocked ? ' <span style="color:var(--red)">— BLOCKED</span>' : ''}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div style="background:#fff9f8;border:1px solid #f3c6c2;border-radius:7px;padding:10px 12px;font-size:12px;line-height:1.7">
+          <div style="font-size:10px;font-weight:700;color:var(--red);text-transform:uppercase;margin-bottom:4px">Before</div>
+          ${originalList.map(item => `• ${highlightOriginal(item, matches)}`).join('<br>')}
+        </div>
+        <div style="background:#f7fdf9;border:1px solid #b9e3cb;border-radius:7px;padding:10px 12px;font-size:12px;line-height:1.7">
+          <div style="font-size:10px;font-weight:700;color:var(--green);text-transform:uppercase;margin-bottom:4px">After</div>
+          ${isBlocked ? '<em style="color:var(--red)">Field blocked entirely.</em>' : redactedList.map(item => `• ${highlightRedacted(item)}`).join('<br>')}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  return `
+    <div class="app-field" style="margin-bottom:14px">
+      <div class="app-field-label">Candidate Name</div>
+      <div class="app-field-val">Deterministically replaced with a de-identified placeholder before any LLM call.
+        The real name is only reattached to this final decision record for admin display here — it was never sent to Claude.</div>
+    </div>
+    <div class="app-field" style="margin-bottom:14px">
+      <div class="app-field-label">Entities Detected &amp; Masked (Amazon Bedrock Guardrails)</div>
+      <div class="tag-list">${entityTags}${blockedTags}</div>
+    </div>
+    ${textRows}
+    ${listRows}
+  `;
 }
 
 function buildRubricTab(d, quantWeight) {
@@ -1397,6 +1597,81 @@ function setRunBtn(loading) {
   btn.disabled = loading;
   document.getElementById('run-icon').innerHTML = loading ? '<span class="spinner"></span>' : '▶';
   document.getElementById('run-label').textContent = loading ? 'Evaluating…' : 'Run Evaluation';
+}
+
+// ── Past Runs ─────────────────────────────────────────────────────────────────
+let _activePastRun = null;
+
+function loadPastRuns() {
+  fetch('/api/results')
+    .then(r => r.json())
+    .then(files => {
+      const list = document.getElementById('past-runs-list');
+      if (!list) return;
+      if (!files.length) {
+        list.innerHTML = '<div class="past-runs-empty">No past runs yet. Run an evaluation to see results here.</div>';
+        return;
+      }
+      list.innerHTML = files.map(f => {
+        const ts = f.timestamp ? new Date(f.timestamp).toLocaleString() : f.filename;
+        const kb = (f.size_bytes / 1024).toFixed(1);
+        const active = _activePastRun === f.filename ? ' active' : '';
+        return `<div class="past-run-item${active}" onclick="loadPastRun('${f.filename}')">
+          <span class="past-run-name" title="${f.filename}">${ts}</span>
+          <span class="past-run-meta">${f.applicant_count} candidate${f.applicant_count !== 1 ? 's' : ''} · ${kb} KB</span>
+        </div>`;
+      }).join('');
+    })
+    .catch(() => {});
+}
+
+function loadPastRun(filename) {
+  _activePastRun = filename;
+  setStatus('running', 'Loading…');
+  fetch('/api/results/' + encodeURIComponent(filename))
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { setStatus('error', data.error); return; }
+      loadFromData(data, filename);
+      loadPastRuns(); // re-render sidebar to highlight active run
+    })
+    .catch(() => setStatus('error', 'Failed to load run'));
+}
+
+function loadFromData(data, filename) {
+  const decs  = data.decisions  || [];
+  const calib = data.calibration;
+
+  document.getElementById('empty-state').classList.add('hidden');
+  document.getElementById('results-wrap').classList.remove('hidden');
+  document.getElementById('progress-section').classList.add('hidden');
+  document.getElementById('table-section').classList.add('hidden');
+  document.getElementById('cal-section').classList.add('hidden');
+  document.getElementById('results-tbody').innerHTML = '';
+  document.getElementById('stats-row').innerHTML     = '';
+  document.getElementById('cal-stats').innerHTML     = '';
+  document.getElementById('cal-insights').innerHTML  = '';
+  document.getElementById('cal-records').innerHTML   = '';
+
+  decisions = decs;
+  decs.forEach(d => addTableRow(d));
+
+  if (decs.length) {
+    document.getElementById('table-section').classList.remove('hidden');
+    updateStats();
+  }
+  if (calib) renderCalibration(calib);
+
+  // Sync to sessionStorage so the Funnel Dashboard opens this run too
+  try {
+    sessionStorage.setItem('dash_d', JSON.stringify(decs));
+    if (calib) sessionStorage.setItem('dash_c', JSON.stringify(calib));
+  } catch(e) {}
+
+  const ts = data.timestamp ? new Date(data.timestamp).toLocaleString() : (filename || 'past run');
+  setStatus('done', `Loaded · ${decs.length} decisions`);
+  document.getElementById('topbar-sub').textContent =
+    `Past run — ${ts} — ${decs.length} candidate${decs.length !== 1 ? 's' : ''}`;
 }
 </script>
 </body>

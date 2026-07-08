@@ -8,12 +8,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Install dependencies
 pip install -r requirements.txt
 
-# Run locally (stub mode — no API key needed)
+# Run locally (stub mode — no AWS or Anthropic credentials needed)
 python app.py
 # Open http://localhost:5000
 
-# Run with live Claude mode
-ANTHROPIC_API_KEY=sk-ant-api03-... python app.py
+# Run with Redaction Only mode (real Bedrock Guardrails, no Claude call)
+GUARDRAIL_ID=... GUARDRAIL_VERSION=... AWS_REGION=us-east-1 python app.py
+
+# Run with Live Claude mode (real Bedrock Guardrails + real Claude)
+# Same env vars as above; the Anthropic API key is entered in the UI per-run,
+# not set as a server env var — Live mode needs both.
 
 # Production server (matches Railway deploy)
 gunicorn app:app --bind 0.0.0.0:5000 --workers 1 --threads 4 --timeout 300
@@ -21,45 +25,135 @@ gunicorn app:app --bind 0.0.0.0:5000 --workers 1 --threads 4 --timeout 300
 
 There are no automated tests. Manual testing is done through the browser UI or by importing `scholarship_eval` modules directly.
 
+## Storage
+
+Applications and results are stored in a **dedicated AWS S3 bucket** for
+this project (not shared with any sibling project).
+
+- **S3 mode** (production): when `S3_BUCKET_NAME` (and `AWS_REGION`) are set
+- **Local mode** (development fallback): reads `applications/*.json`, writes `results/`
+
+### Environment variables
+
+| Variable | Purpose |
+|---|---|
+| `S3_BUCKET_NAME` | Dedicated S3 bucket for this project's `applications/` and `results/` |
+| `AWS_REGION` | Region for both S3 and Bedrock Guardrails (default `us-east-1`) |
+| `GUARDRAIL_ID` / `GUARDRAIL_VERSION` | Bedrock Guardrail used by `PIIRedactor` (required for Redaction Only and Live modes) |
+| `ALLOW_LIVE_MODE` | Set to `false` on a public deployment to hide Live Claude mode in the UI and reject it server-side (`/api/evaluate` returns 403), so visitors are never invited to paste their own Anthropic API key into an unfamiliar public site. Defaults to enabled (unset = `true`). Stub Demo and Redaction Only are unaffected. |
+
+AWS credentials themselves come from the environment/instance role in the
+usual boto3 way (`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` or an
+attached IAM role on Railway) — not passed through the app.
+
+### Bucket layout
+
+```
+applications/app_001.json   ← one file per candidate
+applications/app_002.json
+...
+results/results_<timestamp>_<job_id>.json   ← one file per evaluation run
+```
+
+### Viewing past runs
+
+Use the `/api/results` endpoint, the Past Runs accordion in the sidebar, or
+the Past Runs dropdown on `/dashboard`.
+
 ## Architecture
 
-This is a single-file Flask app (`app.py`) backed by a pure-Python evaluation package (`scholarship_eval/`). There is no database — all state is in-memory within a request or job.
+Every candidate now passes through a redaction stage before anything else,
+then the same 5-stage evaluation pipeline as before:
 
-### Evaluation pipeline (5 stages)
+0. **PIIRedactor** (`pii_redaction.py`) — real Amazon Bedrock Guardrails
+   call. Masks or blocks PII in `personal_statement`, `psychological_profile`,
+   `specializations`, and `awards` before any LLM or simulated reviewer sees
+   them. Produces a `RedactedApplication` + `RedactionReport` (entities
+   masked, blocked fields, guardrail-intervened flag).
+1. **AnalysisAgent / StubAnalysisAgent** — extracts `Evidence` from the
+   (possibly redacted) `Application`.
+2. **ScoringAgent / StubScoringAgent** — produces rubric scores (0–25 × 4
+   dimensions: Technical Expertise, Physical & Medical Fitness, Mission
+   Experience, Psychological Readiness).
+3. **SignalEvaluator** — computes composite risk score, determines routing
+   tier.
+4. **Routing** — maps composite risk to `ReviewType`.
+5. **HumanReviewLayer** — simulates reviewer personas.
 
-Every applicant passes through the same pipeline, implemented twice — once using real Claude API calls (`Orchestrator`) and once with deterministic heuristics (`StubOrchestrator`):
+### Run modes
 
-1. **AnalysisAgent / StubAnalysisAgent** — extracts structured `Evidence` from a raw `Application` (academic, financial, leadership, essay, key strengths/concerns).
-2. **ScoringAgent / StubScoringAgent** — produces rubric scores across four 0–25 dimensions (academic, financial, leadership, essay). Scores are weighted by `quant_weight` (policy field) to shift emphasis between verifiable structured data and unverifiable qualitative signals.
-3. **SignalEvaluator** — pure-logic module (no LLM). Computes three scores — confidence risk, decision sensitivity, and disagreement score — then combines them into `composite_risk` (0–1). This determines routing tier.
-4. **Routing** — `SignalEvaluator._route()` maps composite risk to one of four `ReviewType` tiers: `AUTO_DECISION`, `PARALLEL_REVIEW`, `ESCALATION`, `SENIOR_ADJUDICATION`.
-5. **HumanReviewLayer** — simulates human reviewers. Reviewer pool has 5 named personas with different biases and styles. Policy type and routing tier shift which reviewers are selected and how much disagreement is simulated.
+Three modes, selectable in the sidebar (and, more narrowly, from the
+Funnel Dashboard's own Run control):
 
-Post-pipeline, `CalibrationSystem.analyse()` aggregates all decisions into a `CalibrationReport` with agreement rate, score delta stats, and actionable insights.
+- **Stub Demo** — pure heuristic simulation. Zero AWS or Anthropic calls.
+- **Redaction Only** — a genuine Bedrock Guardrails call redacts every
+  candidate (provable in the per-candidate Redaction tab), but scoring
+  still uses the free heuristic logic. No Claude call, no model cost.
+- **Live Claude** — real Bedrock Guardrails redaction, then a real Claude
+  call (direct Anthropic API, using the API key entered in the sidebar —
+  not `AnthropicBedrock`; only the redaction step touches AWS/Bedrock).
 
-### Policy system
+### Data layer
 
-`ProgramPolicy` (in `policy.py`) externalises all routing thresholds into one dataclass. Three presets (`high_volume`, `high_dollar`, `regulatory`) demonstrate meaningfully different AI/human agreement behaviour because they alter confidence thresholds, sensitivity rules, disagreement tolerance, reviewer pool weights, and noise parameters together.
-
-The `webapp/` folder is a legacy copy of the codebase from an earlier iteration; the live code is in the root-level `app.py` and `scholarship_eval/`.
+- `data_loader.py` — dual-backend loader; S3 in production, local
+  `applications/`/`results/` folders in dev.
+- `pii_redaction.py` — `PIIRedactor`, `RedactedApplication`,
+  `RedactionReport`, `RedactionFinding`.
+- `redaction_only_orchestrator.py` — `RedactionOnlyOrchestrator` (real
+  redaction + stub scoring, used by Redaction Only mode).
+- `scholarship_eval/orchestrator.py` — `Orchestrator` (stage-0 redaction is
+  optional via the `redactor=` param; `None` in Stub Demo, a real
+  `PIIRedactor` in Live mode).
+- `applications/app_001.json` … `app_010.json` — the 10 candidate
+  applications (formerly `scholarship_eval/mock_data.py`, now superseded
+  by these JSON files + `data_loader.py`; `mock_data.py` is left in place
+  but unused).
 
 ### Request flow
 
 ```
-POST /api/evaluate  → spawns background thread → returns {job_id}
-GET  /api/poll/<id> → drains event queue from thread → returns {status, events[]}
+POST /api/evaluate  → background thread → {job_id}
+GET  /api/poll/<id> → drain event queue → {status, events[]}
+GET  /api/results   → list result files (from S3 or local)
+GET  /api/results/<filename> → load a past run
+GET  /api/config     → {"live_mode_enabled": bool} — drives whether the UI shows Live Claude mode
+GET  /dashboard      → Funnel Dashboard (Chart.js, 6 tabs)
+GET  /about          → narrative project overview
 ```
 
-Events are typed: `start`, `processing`, `result`, `calibration`, `done`, `error`. The frontend polls every second. This polling architecture replaced SSE specifically to avoid Railway proxy buffering.
+Events are typed: `start`, `processing`, `result`, `calibration`, `saved`,
+`done`, `error`. The frontend polls every ~600–800ms. This polling
+architecture avoids SSE buffering issues on Railway and similar reverse
+proxies.
 
 ### Frontend
 
-Single-page app in `templates/index.html` with vanilla JS. All UI state lives in JS variables. The sidebar (accordion) groups controls into Config, Applicants, and Policy sections. Results render as card-per-applicant with tabs (Summary, Evidence, Rubric, Signals, Audit Trail). Calibration renders in a separate panel below the results grid.
+- `templates/index.html` — single-page evaluator. Accordion sidebar
+  (Selection Policy, Confidence & Routing, Decision Sensitivity, Signal
+  Hierarchy, Disagreement Controls, Oversight, Past Runs), 3-way run-mode
+  toggle, per-candidate audit panel with 6 tabs (Application, Redaction,
+  Rubric, Scores, Signals, Audit).
+- `templates/dashboard.html` — Funnel Dashboard. 6 tabs (Funnel Overview,
+  AI–Human Alignment, Routing Intelligence, Score Distribution, Risk
+  Signals, Reviewer Performance), drilldown tables, Past Runs dropdown.
+  Domain-agnostic JS shared in spirit with the sibling `bedrock_poc`
+  project's dashboard (not a shared dependency — a parallel copy).
+- `static/about.html` — narrative, storytelling-style overview of the
+  pipeline, signal hierarchy, routing tiers, and presets; not a technical
+  reference.
+
+The `webapp/` folder is a legacy copy of the codebase from an earlier
+iteration; the live code is the root-level `app.py` and `scholarship_eval/`.
 
 ## Key data flow types
 
-`Application` → `Evidence` → `ScoringResult` → `SignalEvaluation` → `Decision` (final record with full audit trail). `CalibrationRecord` and `CalibrationReport` are derived from a batch of `Decision` objects.
+`Application` → (optional) `RedactedApplication` → `Evidence` →
+`ScoringResult` → `SignalEvaluation` → `Decision` (final record with full
+audit trail, including `redacted_application` and `redaction_report` when
+redaction ran). `CalibrationRecord` and `CalibrationReport` are derived
+from a batch of `Decision` objects.
 
 ## Deployment
 
-Deployed on Railway via `railway.toml`. The Procfile and `railway.toml` both specify `gunicorn` with `--workers 1 --threads 4` — single worker is intentional because the in-memory job store (`_jobs` dict in `app.py`) is not shared across workers.
+Deployed on Railway. Single worker is intentional (in-memory job store).
+Results persist across deploys via the dedicated S3 bucket.
