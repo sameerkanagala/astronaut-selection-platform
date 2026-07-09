@@ -365,7 +365,7 @@
     <div class="sidebar-body">
 
       <!-- ── Always visible: Run Settings ──────────────────────── -->
-      <div class="field">
+      <div class="field" id="run-mode-field">
         <label>Run Mode</label>
         <div class="toggle-row">
           <button class="toggle-btn active" id="btn-stub"      onclick="setMode('stub')">Stub Demo</button>
@@ -374,6 +374,19 @@
         </div>
         <small id="mode-desc" style="font-size:10px;color:#6a9bbf;line-height:1.5;display:block;margin-top:6px">
           Pure heuristic simulation — zero AWS calls, instant, free.
+        </small>
+      </div>
+      <!-- Shown instead of the Run Mode toggle when both Live Claude and real
+           Bedrock redaction are disabled (ALLOW_LIVE_MODE=false and
+           ALLOW_REAL_REDACTION=false) — on a public deployment there's no
+           meaningful choice left between "no redaction" and "redaction demo",
+           so every visitor just gets the fuller (simulated) experience. -->
+      <div class="field hidden" id="mode-locked-note">
+        <label>Demo Mode</label>
+        <small style="font-size:10px;color:#6a9bbf;line-height:1.5;display:block">
+          This public demo runs heuristic scoring plus a simulated PII-redaction
+          pass (local pattern matching) on every candidate — no AWS or
+          Anthropic API keys are ever used here.
         </small>
       </div>
       <div class="field hidden" id="apikey-field">
@@ -698,6 +711,26 @@ document.addEventListener('DOMContentLoaded', () => {
   fetch('/api/applications').then(r=>r.json()).then(apps => { allApps=apps; renderAppList(apps); });
   fetch('/api/presets').then(r=>r.json()).then(p => { presets=p; });
   fetch('/api/config').then(r=>r.json()).then(cfg => {
+    if (!cfg.real_redaction_enabled) {
+      realRedactionEnabled = false;
+      MODE_DESCRIPTIONS.redaction_only = 'Simulated redaction — local pattern matching (no AWS Bedrock call, zero cost) demonstrates the same before/after masking in the Redaction tab. Scoring still uses the free heuristic logic.';
+    }
+
+    const bothDisabled = !cfg.live_mode_enabled && !cfg.real_redaction_enabled;
+
+    if (bothDisabled) {
+      // No real AWS or Anthropic calls are ever possible on this deployment,
+      // so Stub Demo vs Redaction Only is no longer a meaningful choice —
+      // collapse to a single always-on (simulated) redaction demo instead of
+      // showing a 3-way toggle where two options behave identically.
+      const modeField = document.getElementById('run-mode-field');
+      if (modeField) modeField.classList.add('hidden');
+      const lockedNote = document.getElementById('mode-locked-note');
+      if (lockedNote) lockedNote.classList.remove('hidden');
+      setMode('redaction_only');
+      return;
+    }
+
     if (!cfg.live_mode_enabled) {
       const liveBtn = document.getElementById('btn-live');
       if (liveBtn) {
@@ -707,8 +740,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (mode === 'live') setMode('stub');
     }
     if (!cfg.real_redaction_enabled) {
-      realRedactionEnabled = false;
-      MODE_DESCRIPTIONS.redaction_only = 'Simulated redaction — local pattern matching (no AWS Bedrock call, zero cost) demonstrates the same before/after masking in the Redaction tab. Scoring still uses the free heuristic logic.';
       const redactionBtn = document.getElementById('btn-redaction');
       if (redactionBtn) redactionBtn.title = 'This deployment simulates redaction locally instead of calling real AWS Bedrock Guardrails, to avoid per-visitor AWS cost.';
       if (mode === 'redaction_only') setMode('redaction_only'); // refresh the description text

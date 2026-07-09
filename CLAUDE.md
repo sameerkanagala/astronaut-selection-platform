@@ -90,6 +90,16 @@ Funnel Dashboard's own Run control):
 - **Redaction Only** — a genuine Bedrock Guardrails call redacts every
   candidate (provable in the per-candidate Redaction tab), but scoring
   still uses the free heuristic logic. No Claude call, no model cost.
+  Falls back to `StubPIIRedactor` when `ALLOW_REAL_REDACTION=false`.
+
+When both `ALLOW_LIVE_MODE=false` and `ALLOW_REAL_REDACTION=false` (the
+public deployment's permanent state), the Run Mode toggle itself is hidden
+in `templates/index.html` — Stub Demo and Redaction Only would otherwise
+be functionally identical (same heuristic scoring either way, and no real
+AWS call happens in either case), so the UI just always runs the fuller
+(simulated) redaction demo instead of offering a choice with no real
+difference. See the `bothDisabled` branch of the `/api/config` handler in
+`index.html`.
 - **Live Claude** — real Bedrock Guardrails redaction, then a real Claude
   call (direct Anthropic API, using the API key entered in the sidebar —
   not `AnthropicBedrock`; only the redaction step touches AWS/Bedrock).
