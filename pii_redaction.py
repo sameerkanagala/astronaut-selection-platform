@@ -244,6 +244,13 @@ class StubPIIRedactor:
         r"\b(?:Dr|Prof|Professor|Colonel|Commander|Wing Commander|Captain|Capt|"
         r"Major|General|Mr|Mrs|Ms)\.?\s+[A-Z][a-zA-Z'-]+(?:\s+[A-Z][a-zA-Z'-]+){1,2}\b"
     )
+    # Strips a leading honorific off the candidate's own `name` field (some
+    # entries store it as e.g. "Dr. Sarah Chen") so _own_name_pattern() can
+    # build a plain-name match from what's left.
+    _TITLE_PREFIX_RE = re.compile(
+        r"^(?:Dr|Prof|Professor|Colonel|Commander|Wing Commander|Captain|Capt|"
+        r"Major|General|Mr|Mrs|Ms)\.?\s+"
+    )
 
     def redact(self, application: Application) -> Tuple[RedactedApplication, RedactionReport]:
         report = RedactionReport(application_id=application.id, engine="stub")
@@ -257,8 +264,15 @@ class StubPIIRedactor:
             "awards": _JOIN_MARK.join(application.awards or []),
         }
 
+        # The honorific-based _NAME_RE above only catches OTHER people (an
+        # evaluator, a reference) introduced with a title. It won't catch the
+        # candidate's own name if free text refers back to them by surname
+        # alone (e.g. an evaluator writing "...Briggs's performance..."), so
+        # build a second pattern from the candidate's own name specifically.
+        own_name_re = self._own_name_pattern(application.name)
+
         masked_values = {
-            field_name: self._mask_text(text, field_name, report)
+            field_name: self._mask_text(text, field_name, report, own_name_re)
             for field_name, text in raw_values.items()
         }
 
@@ -282,7 +296,24 @@ class StubPIIRedactor:
         )
         return redacted, report
 
-    def _mask_text(self, text: str, field_name: str, report: RedactionReport) -> str:
+    def _own_name_pattern(self, name: str) -> Optional["re.Pattern"]:
+        """Build a regex matching the candidate's own name — both the full
+        name and the surname alone — from the structured `name` field, so
+        it's masked wherever it appears in free text, honorific or not."""
+        if not name:
+            return None
+        plain = self._TITLE_PREFIX_RE.sub("", name).strip()
+        tokens = [t for t in re.split(r"\s+", plain) if t]
+        if not tokens:
+            return None
+        alternatives = []
+        if len(tokens) > 1:
+            alternatives.append(re.escape(plain))  # full name, e.g. "Tom Briggs"
+        alternatives.append(re.escape(tokens[-1]))  # surname alone, e.g. "Briggs"
+        return re.compile(r"\b(?:" + "|".join(alternatives) + r")\b")
+
+    def _mask_text(self, text: str, field_name: str, report: RedactionReport,
+                    own_name_re: Optional["re.Pattern"] = None) -> str:
         if not text.strip():
             return text
 
@@ -296,5 +327,7 @@ class StubPIIRedactor:
 
         text = _sub(self._EMAIL_RE, "EMAIL", text)
         text = _sub(self._PHONE_RE, "PHONE", text)
+        if own_name_re:
+            text = _sub(own_name_re, "NAME", text)
         text = _sub(self._NAME_RE, "NAME", text)
         return text
