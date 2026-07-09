@@ -38,6 +38,7 @@ Design notes
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -67,6 +68,12 @@ class RedactionReport:
     application_id: str
     findings: List[RedactionFinding] = field(default_factory=list)
     guardrail_intervened: bool = False
+    # "bedrock" (default) = a real ApplyGuardrail call produced this report.
+    # "stub" = StubPIIRedactor produced it via local regex matching, no AWS
+    # call at all. The frontend's Redaction tab reads this to label the
+    # result honestly rather than implying every visitor triggers billed
+    # AWS usage.
+    engine: str = "bedrock"
 
     def entity_counts(self) -> Dict[str, int]:
         counts: Dict[str, int] = {}
@@ -207,3 +214,87 @@ class PIIRedactor:
             psychological_profile=masked_values["psychological_profile"],
         )
         return redacted, report
+
+
+class StubPIIRedactor:
+    """Zero-cost stand-in for PIIRedactor, used when ALLOW_REAL_REDACTION is
+    false (see app.py) — e.g. on a public deployment where Redaction Only
+    mode has no password gate and would otherwise let any visitor trigger
+    real, billed Amazon Bedrock Guardrails calls just by clicking a button.
+
+    Detects the same three PII shapes the demo dataset actually contains —
+    a person's name introduced by a military/academic honorific, an email
+    address, a phone number — using local regex matching instead of a real
+    ApplyGuardrail call. Same public `.redact()` interface and return
+    shapes as PIIRedactor, so the rest of the pipeline and the UI don't
+    need to know which one ran. The only difference downstream is
+    RedactionReport.engine ("stub" instead of "bedrock"), which the
+    frontend's Redaction tab uses to label the result honestly rather than
+    implying a real AWS call happened.
+
+    This is a heuristic demo aid, not a security control — it will miss
+    PII shapes outside these three patterns. It exists purely so a public
+    visitor can see a convincing before/after redaction demo without
+    costing the site owner anything.
+    """
+
+    _EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
+    _PHONE_RE = re.compile(r"\+?\d[\d\-.\s]{6,}\d")
+    _NAME_RE = re.compile(
+        r"\b(?:Dr|Prof|Professor|Colonel|Commander|Wing Commander|Captain|Capt|"
+        r"Major|General|Mr|Mrs|Ms)\.?\s+[A-Z][a-zA-Z'-]+(?:\s+[A-Z][a-zA-Z'-]+){1,2}\b"
+    )
+
+    def redact(self, application: Application) -> Tuple[RedactedApplication, RedactionReport]:
+        report = RedactionReport(application_id=application.id, engine="stub")
+        report.findings.append(RedactionFinding(field="name", type="NAME", action="ANONYMIZE"))
+        placeholder_name = f"Candidate {application.id}"
+
+        raw_values: Dict[str, str] = {
+            "personal_statement": application.personal_statement or "",
+            "psychological_profile": application.psychological_profile or "",
+            "specializations": _JOIN_MARK.join(application.specializations or []),
+            "awards": _JOIN_MARK.join(application.awards or []),
+        }
+
+        masked_values = {
+            field_name: self._mask_text(text, field_name, report)
+            for field_name, text in raw_values.items()
+        }
+
+        redacted = RedactedApplication(
+            id=application.id,
+            name=placeholder_name,
+            age=application.age,
+            nationality=application.nationality,
+            stem_field=application.stem_field,
+            candidate_level=application.candidate_level,
+            military_background=application.military_background,
+            flight_hours=application.flight_hours,
+            advanced_degrees=application.advanced_degrees,
+            physical_fitness_score=application.physical_fitness_score,
+            medical_clearance=application.medical_clearance,
+            specializations=[s for s in masked_values["specializations"].split(_JOIN_MARK) if s],
+            prior_missions=application.prior_missions,
+            awards=[s for s in masked_values["awards"].split(_JOIN_MARK) if s],
+            personal_statement=masked_values["personal_statement"],
+            psychological_profile=masked_values["psychological_profile"],
+        )
+        return redacted, report
+
+    def _mask_text(self, text: str, field_name: str, report: RedactionReport) -> str:
+        if not text.strip():
+            return text
+
+        def _sub(pattern: "re.Pattern", entity_type: str, s: str) -> str:
+            def _repl(m: "re.Match") -> str:
+                report.findings.append(RedactionFinding(
+                    field=field_name, type=entity_type, action="ANONYMIZE", match=m.group(0)))
+                report.guardrail_intervened = True
+                return f"{{{entity_type}}}"
+            return pattern.sub(_repl, s)
+
+        text = _sub(self._EMAIL_RE, "EMAIL", text)
+        text = _sub(self._PHONE_RE, "PHONE", text)
+        text = _sub(self._NAME_RE, "NAME", text)
+        return text

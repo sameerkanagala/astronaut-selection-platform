@@ -99,6 +99,13 @@ or `/about` for the project overview.
    their own Anthropic API key. Stub Demo and Redaction Only stay fully
    available (neither needs one). Leave it unset when running locally for
    yourself to keep Live Claude mode available.
+6. **Redaction Only has no password gate**, so on a public deployment also
+   set `ALLOW_REAL_REDACTION = false`. This makes Redaction Only fall back
+   to `StubPIIRedactor` — a local regex-based stand-in with zero AWS calls
+   — instead of a real, billed Amazon Bedrock Guardrails call per visitor
+   click. The Redaction tab clearly labels which one ran ("Simulated" vs
+   "Real Amazon Bedrock Guardrails call"). Leave it unset locally to use
+   real Bedrock redaction.
 
 > Stub Demo mode works with zero configuration.
 

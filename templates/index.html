@@ -691,6 +691,7 @@ let allApps          = [];
 let decisions        = [];
 let presets          = {};
 let awardSensitivity = 'low';
+let realRedactionEnabled = true;
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -704,6 +705,13 @@ document.addEventListener('DOMContentLoaded', () => {
         liveBtn.title = 'Live Claude mode is disabled on this public deployment.';
       }
       if (mode === 'live') setMode('stub');
+    }
+    if (!cfg.real_redaction_enabled) {
+      realRedactionEnabled = false;
+      MODE_DESCRIPTIONS.redaction_only = 'Simulated redaction — local pattern matching (no AWS Bedrock call, zero cost) demonstrates the same before/after masking in the Redaction tab. Scoring still uses the free heuristic logic.';
+      const redactionBtn = document.getElementById('btn-redaction');
+      if (redactionBtn) redactionBtn.title = 'This deployment simulates redaction locally instead of calling real AWS Bedrock Guardrails, to avoid per-visitor AWS cost.';
+      if (mode === 'redaction_only') setMode('redaction_only'); // refresh the description text
     }
   }).catch(() => {});
   loadPastRuns();
@@ -1243,11 +1251,21 @@ function buildRedactionTab(d, appData) {
         No AWS or Bedrock calls happen in this mode — it's a pure heuristic simulation.
         Switch to <strong>Redaction Only</strong> in the sidebar and re-run to see this
         candidate's personal statement, psychological profile, specializations, and awards
-        actually redacted by real Amazon Bedrock Guardrails calls — no Claude call required
-        for that mode.
+        actually redacted — no Claude call required for that mode.
       </p>
     </div>`;
   }
+
+  const isStubEngine = r.engine === 'stub';
+  const engineBanner = isStubEngine
+    ? `<div style="margin-bottom:14px;padding:10px 12px;background:#fff8e1;border:1px solid #ffe082;border-radius:7px;font-size:12px;color:#8a6d00;line-height:1.5">
+        🧪 <strong>Simulated redaction</strong> — this deployment matches PII with local regex patterns instead of
+        calling real Amazon Bedrock Guardrails, so public visitors can see this demo with zero AWS cost.
+        The masking logic below (entity types, before/after) works the same way; it's just not a billed AWS call.
+      </div>`
+    : `<div style="margin-bottom:14px;padding:10px 12px;background:#e8f5e9;border:1px solid #a5d6a7;border-radius:7px;font-size:12px;color:#1b5e20;line-height:1.5">
+        ✅ <strong>Real Amazon Bedrock Guardrails call</strong> — the masking below reflects a genuine AWS API response.
+      </div>`;
 
   const entityTags = Object.keys(r.entity_counts || {}).length
     ? Object.entries(r.entity_counts).map(([t, c]) =>
@@ -1306,13 +1324,14 @@ function buildRedactionTab(d, appData) {
   }).join('');
 
   return `
+    ${engineBanner}
     <div class="app-field" style="margin-bottom:14px">
       <div class="app-field-label">Candidate Name</div>
       <div class="app-field-val">Deterministically replaced with a de-identified placeholder before any LLM call.
         The real name is only reattached to this final decision record for admin display here — it was never sent to Claude.</div>
     </div>
     <div class="app-field" style="margin-bottom:14px">
-      <div class="app-field-label">Entities Detected &amp; Masked (Amazon Bedrock Guardrails)</div>
+      <div class="app-field-label">Entities Detected &amp; Masked ${isStubEngine ? '(Simulated — local pattern matching)' : '(Amazon Bedrock Guardrails)'}</div>
       <div class="tag-list">${entityTags}${blockedTags}</div>
     </div>
     ${textRows}

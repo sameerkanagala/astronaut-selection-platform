@@ -1,12 +1,13 @@
 """Redaction-Only Orchestrator.
 
-Does REAL Amazon Bedrock Guardrails redaction (genuine AWS API calls via
-PIIRedactor), but scores every candidate with the same free heuristic
-logic Stub Demo mode uses instead of calling Claude. This demonstrates
-real, provable redaction without any Claude/model usage or cost.
+Runs PII redaction (genuine Amazon Bedrock Guardrails API calls via
+PIIRedactor, or the zero-cost StubPIIRedactor fallback — see
+ALLOW_REAL_REDACTION in app.py), but scores every candidate with the same
+free heuristic logic Stub Demo mode uses instead of calling Claude. This
+demonstrates redaction without any Claude/model usage or cost.
 
-Pipeline: real PIIRedactor -> StubAnalysisAgent -> StubScoringAgent ->
-SignalEvaluator -> routing -> simulated HumanReviewLayer. Every stage
+Pipeline: redactor (real or stub) -> StubAnalysisAgent -> StubScoringAgent
+-> SignalEvaluator -> routing -> simulated HumanReviewLayer. Every stage
 after redaction operates on the de-identified view, same as the fully-
 live Orchestrator (see scholarship_eval/orchestrator.py) — the only
 difference is Claude is never called.
@@ -16,11 +17,13 @@ from scholarship_eval.stub_agents import StubAnalysisAgent, StubScoringAgent
 from scholarship_eval.human_review import HumanReviewLayer
 from scholarship_eval.signal_evaluator import SignalEvaluator
 from scholarship_eval.policy import ProgramPolicy, PRESETS
-from pii_redaction import PIIRedactor
 
 
 class RedactionOnlyOrchestrator:
-    def __init__(self, redactor: PIIRedactor, policy: ProgramPolicy = None, verbose: bool = True):
+    def __init__(self, redactor, policy: ProgramPolicy = None, verbose: bool = True):
+        """`redactor` is either a real PIIRedactor or a StubPIIRedactor —
+        both share the same `.redact()` interface, so this class doesn't
+        need to know or care which one it was handed."""
         self.policy = policy or PRESETS["initial_screening"]
         self.redactor = redactor
         self.analysis_agent = StubAnalysisAgent()
@@ -34,14 +37,18 @@ class RedactionOnlyOrchestrator:
     def evaluate(self, application: Application) -> Decision:
         audit = []
 
+        engine_label = ("Bedrock Guardrails, real AWS call" if type(self.redactor).__name__ == "PIIRedactor"
+                        else "simulated locally, no AWS call")
+
         self._log(f"\n{'='*55}\n  {application.id} — {application.name} (redaction-only)\n{'='*55}")
-        self._log("  [0/5] PII Redaction (Bedrock Guardrails, real AWS call) ...")
+        self._log(f"  [0/5] PII Redaction ({engine_label}) ...")
         redacted, redaction_report = self.redactor.redact(application)
         entity_counts = redaction_report.entity_counts()
         total_entities = sum(entity_counts.values())
         blocked = redaction_report.blocked_fields()
+        source = "Bedrock Guardrails" if redaction_report.engine == "bedrock" else "Simulated redaction (local pattern matching, no AWS call)"
         summary = (
-            f"Bedrock Guardrails masked {total_entities} PII entit{'y' if total_entities == 1 else 'ies'} "
+            f"{source} masked {total_entities} PII entit{'y' if total_entities == 1 else 'ies'} "
             f"({', '.join(f'{t}:{c}' for t, c in entity_counts.items()) or 'none detected'}) "
             f"before this candidate reached the scoring stage."
             + (f" BLOCKED fields (guardrail intervened): {', '.join(blocked)}." if blocked else "")

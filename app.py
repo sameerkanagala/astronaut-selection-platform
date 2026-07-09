@@ -48,6 +48,16 @@ REGION = os.environ.get("AWS_REGION", "us-east-1")
 # key. Leave unset (default: enabled) for local/private use.
 LIVE_MODE_ENABLED = os.environ.get("ALLOW_LIVE_MODE", "true").strip().lower() != "false"
 
+# Set ALLOW_REAL_REDACTION=false on a public deployment to make Redaction
+# Only (and Live Claude's redaction stage) fall back to StubPIIRedactor — a
+# local regex-based stand-in with zero AWS calls and zero cost — instead of
+# a real Amazon Bedrock Guardrails call. Redaction Only has no password
+# gate on this project, so without this flag any visitor could trigger
+# real, billed AWS usage just by clicking a button. Defaults to enabled
+# (unset = "true") so local/private use is unaffected. Stub Demo never
+# touches this either way.
+REAL_REDACTION_ENABLED = os.environ.get("ALLOW_REAL_REDACTION", "true").strip().lower() != "false"
+
 # ── In-memory job store ───────────────────────────────────────────────────────
 # { job_id: { "status": "running"|"done"|"error", "queue": deque, "lock": Lock } }
 _jobs: dict = {}
@@ -146,6 +156,7 @@ def decision_to_dict(decision) -> dict:
         # never touches Bedrock, so this is None there — templates/index.html's
         # Redaction tab checks for that and explains why).
         "redaction": {
+            "engine": getattr(rr, "engine", "bedrock"),
             "entity_counts": rr.entity_counts(),
             "blocked_fields": rr.blocked_fields(),
             "guardrail_intervened": rr.guardrail_intervened,
@@ -185,30 +196,37 @@ def calibration_to_dict(report) -> dict:
 
 # ── Background worker ─────────────────────────────────────────────────────────
 
+def _build_redactor():
+    """Real Bedrock Guardrails PIIRedactor if ALLOW_REAL_REDACTION permits
+    it, else the zero-cost StubPIIRedactor (see REAL_REDACTION_ENABLED)."""
+    from pii_redaction import PIIRedactor, StubPIIRedactor
+
+    if not REAL_REDACTION_ENABLED:
+        return StubPIIRedactor()
+
+    guardrail_id = os.environ["GUARDRAIL_ID"]
+    guardrail_version = os.environ["GUARDRAIL_VERSION"]
+    return PIIRedactor(guardrail_id=guardrail_id, guardrail_version=guardrail_version, region=REGION)
+
+
 def _build_live_orchestrator(api_key: str, model: str):
     """Constructed lazily, only when a "live" job actually runs — Stub Demo
     and Redaction Only must work without an Anthropic API key configured."""
     from anthropic import Anthropic
     from scholarship_eval.orchestrator import Orchestrator
-    from pii_redaction import PIIRedactor
 
-    guardrail_id = os.environ["GUARDRAIL_ID"]
-    guardrail_version = os.environ["GUARDRAIL_VERSION"]
     client = Anthropic(api_key=api_key)
-    redactor = PIIRedactor(guardrail_id=guardrail_id, guardrail_version=guardrail_version, region=REGION)
+    redactor = _build_redactor()
     return Orchestrator(client=client, model=model, redactor=redactor, verbose=False)
 
 
 def _build_redaction_only_orchestrator():
     """Constructed lazily, same reasoning as _build_live_orchestrator. Only
-    needs GUARDRAIL_ID/GUARDRAIL_VERSION/AWS credentials — no Anthropic API
-    key, since this mode never calls Claude."""
+    needs GUARDRAIL_ID/GUARDRAIL_VERSION/AWS credentials when real redaction
+    is enabled — no Anthropic API key, since this mode never calls Claude."""
     from redaction_only_orchestrator import RedactionOnlyOrchestrator
-    from pii_redaction import PIIRedactor
 
-    guardrail_id = os.environ["GUARDRAIL_ID"]
-    guardrail_version = os.environ["GUARDRAIL_VERSION"]
-    redactor = PIIRedactor(guardrail_id=guardrail_id, guardrail_version=guardrail_version, region=REGION)
+    redactor = _build_redactor()
     return RedactionOnlyOrchestrator(redactor=redactor, verbose=False)
 
 
@@ -343,9 +361,14 @@ def get_presets():
 
 @app.route("/api/config")
 def get_config():
-    """Frontend feature flags. Currently just whether Live Claude mode
-    (visitor-supplied Anthropic API key) is exposed on this deployment."""
-    return jsonify({"live_mode_enabled": LIVE_MODE_ENABLED})
+    """Frontend feature flags: whether Live Claude mode (visitor-supplied
+    Anthropic API key) is exposed, and whether Redaction Only actually
+    calls real Amazon Bedrock Guardrails or falls back to the zero-cost
+    StubPIIRedactor on this deployment."""
+    return jsonify({
+        "live_mode_enabled": LIVE_MODE_ENABLED,
+        "real_redaction_enabled": REAL_REDACTION_ENABLED,
+    })
 
 
 @app.route("/api/evaluate", methods=["POST"])

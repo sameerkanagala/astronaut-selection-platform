@@ -41,6 +41,7 @@ this project (not shared with any sibling project).
 | `AWS_REGION` | Region for both S3 and Bedrock Guardrails (default `us-east-1`) |
 | `GUARDRAIL_ID` / `GUARDRAIL_VERSION` | Bedrock Guardrail used by `PIIRedactor` (required for Redaction Only and Live modes) |
 | `ALLOW_LIVE_MODE` | Set to `false` on a public deployment to hide Live Claude mode in the UI and reject it server-side (`/api/evaluate` returns 403), so visitors are never invited to paste their own Anthropic API key into an unfamiliar public site. Defaults to enabled (unset = `true`). Stub Demo and Redaction Only are unaffected. |
+| `ALLOW_REAL_REDACTION` | Set to `false` on a public deployment to make Redaction Only (and Live Claude's redaction stage) fall back to `StubPIIRedactor` — a local regex-based stand-in with zero AWS calls and zero cost — instead of a real Amazon Bedrock Guardrails call. Redaction Only has no password gate, so without this any visitor could trigger real, billed AWS usage just by clicking a button. Defaults to enabled (unset = `true`). The Redaction tab labels results "Simulated" vs "Real Amazon Bedrock Guardrails call" accordingly, driven by `/api/config`'s `real_redaction_enabled` flag. |
 
 AWS credentials themselves come from the environment/instance role in the
 usual boto3 way (`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` or an
@@ -97,8 +98,10 @@ Funnel Dashboard's own Run control):
 
 - `data_loader.py` — dual-backend loader; S3 in production, local
   `applications/`/`results/` folders in dev.
-- `pii_redaction.py` — `PIIRedactor`, `RedactedApplication`,
-  `RedactionReport`, `RedactionFinding`.
+- `pii_redaction.py` — `PIIRedactor` (real Bedrock Guardrails),
+  `StubPIIRedactor` (zero-cost local regex fallback used when
+  `ALLOW_REAL_REDACTION=false`), `RedactedApplication`, `RedactionReport`
+  (carries an `engine` field: `"bedrock"` or `"stub"`), `RedactionFinding`.
 - `redaction_only_orchestrator.py` — `RedactionOnlyOrchestrator` (real
   redaction + stub scoring, used by Redaction Only mode).
 - `scholarship_eval/orchestrator.py` — `Orchestrator` (stage-0 redaction is
@@ -116,7 +119,7 @@ POST /api/evaluate  → background thread → {job_id}
 GET  /api/poll/<id> → drain event queue → {status, events[]}
 GET  /api/results   → list result files (from S3 or local)
 GET  /api/results/<filename> → load a past run
-GET  /api/config     → {"live_mode_enabled": bool} — drives whether the UI shows Live Claude mode
+GET  /api/config     → {"live_mode_enabled": bool, "real_redaction_enabled": bool} — drives the UI's Live Claude visibility and Redaction tab labeling
 GET  /dashboard      → Funnel Dashboard (Chart.js, 6 tabs)
 GET  /about          → narrative project overview
 ```
@@ -128,11 +131,14 @@ proxies.
 
 ### Frontend
 
-- `templates/index.html` — single-page evaluator. Accordion sidebar
-  (Selection Policy, Confidence & Routing, Decision Sensitivity, Signal
-  Hierarchy, Disagreement Controls, Oversight, Past Runs), 3-way run-mode
-  toggle, per-candidate audit panel with 6 tabs (Application, Redaction,
-  Rubric, Scores, Signals, Audit).
+- `templates/index.html` — single-page evaluator. Sidebar has Candidates +
+  Run Evaluation always visible up top, a single "Configure" dropdown below
+  that swaps between settings sections (Selection Policy, Confidence &
+  Routing, Decision Sensitivity, Signal Hierarchy, Disagreement Controls,
+  Oversight, Past Runs) one at a time, 3-way run-mode toggle, per-candidate
+  audit panel with 6 tabs (Application, Redaction, Rubric, Scores, Signals,
+  Audit). The Redaction tab labels each result "Simulated" or "Real Amazon
+  Bedrock Guardrails call" based on `/api/config`'s `real_redaction_enabled`.
 - `templates/dashboard.html` — Funnel Dashboard. 6 tabs (Funnel Overview,
   AI–Human Alignment, Routing Intelligence, Score Distribution, Risk
   Signals, Reviewer Performance), drilldown tables, Past Runs dropdown.
