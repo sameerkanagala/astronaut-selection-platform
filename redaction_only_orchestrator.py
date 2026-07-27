@@ -1,16 +1,12 @@
 """Redaction-Only Orchestrator.
 
-Runs PII redaction (genuine Amazon Bedrock Guardrails API calls via
-PIIRedactor, or the zero-cost StubPIIRedactor fallback — see
-ALLOW_REAL_REDACTION in app.py), but scores every candidate with the same
-free heuristic logic Stub Demo mode uses instead of calling Claude. This
-demonstrates redaction without any Claude/model usage or cost.
+Runs PII redaction via StubPIIRedactor (local, zero-cost, regex-based —
+see pii_redaction.py), then scores every candidate with the same free
+heuristic logic. This demonstrates redaction without any Claude/model
+usage or cost, and without calling any third-party PII detection service.
 
-Pipeline: redactor (real or stub) -> StubAnalysisAgent -> StubScoringAgent
--> SignalEvaluator -> routing -> simulated HumanReviewLayer. Every stage
-after redaction operates on the de-identified view, same as the fully-
-live Orchestrator (see scholarship_eval/orchestrator.py) — the only
-difference is Claude is never called.
+Pipeline: StubPIIRedactor -> StubAnalysisAgent -> StubScoringAgent ->
+SignalEvaluator -> routing -> simulated HumanReviewLayer.
 """
 from scholarship_eval.models import Application, Decision, ReviewType, AuditStep
 from scholarship_eval.stub_agents import StubAnalysisAgent, StubScoringAgent
@@ -21,9 +17,8 @@ from scholarship_eval.policy import ProgramPolicy, PRESETS
 
 class RedactionOnlyOrchestrator:
     def __init__(self, redactor, policy: ProgramPolicy = None, verbose: bool = True):
-        """`redactor` is either a real PIIRedactor or a StubPIIRedactor —
-        both share the same `.redact()` interface, so this class doesn't
-        need to know or care which one it was handed."""
+        """`redactor` is a StubPIIRedactor (or any object sharing its
+        `.redact()` interface)."""
         self.policy = policy or PRESETS["initial_screening"]
         self.redactor = redactor
         self.analysis_agent = StubAnalysisAgent()
@@ -37,23 +32,20 @@ class RedactionOnlyOrchestrator:
     def evaluate(self, application: Application) -> Decision:
         audit = []
 
-        engine_label = ("Bedrock Guardrails, real AWS call" if type(self.redactor).__name__ == "PIIRedactor"
-                        else "simulated locally, no AWS call")
-
         self._log(f"\n{'='*55}\n  {application.id} — {application.name} (redaction-only)\n{'='*55}")
-        self._log(f"  [0/5] PII Redaction ({engine_label}) ...")
+        self._log(f"  [0/5] PII Redaction (simulated locally, no AWS call) ...")
         redacted, redaction_report = self.redactor.redact(application)
         entity_counts = redaction_report.entity_counts()
         total_entities = sum(entity_counts.values())
         blocked = redaction_report.blocked_fields()
-        source = "Bedrock Guardrails" if redaction_report.engine == "bedrock" else "Simulated redaction (local pattern matching, no AWS call)"
+        source = "Simulated redaction (local pattern matching, no AWS call)"
         summary = (
             f"{source} masked {total_entities} PII entit{'y' if total_entities == 1 else 'ies'} "
             f"({', '.join(f'{t}:{c}' for t, c in entity_counts.items()) or 'none detected'}) "
             f"before this candidate reached the scoring stage."
             + (f" BLOCKED fields (guardrail intervened): {', '.join(blocked)}." if blocked else "")
         )
-        audit.append(AuditStep(step="0_pii_redaction", agent="PIIRedactor", summary=summary,
+        audit.append(AuditStep(step="0_pii_redaction", agent="StubPIIRedactor", summary=summary,
                                 metadata={"entity_counts": entity_counts, "blocked_fields": blocked,
                                           "guardrail_intervened": redaction_report.guardrail_intervened}))
 

@@ -365,19 +365,15 @@
     <div class="sidebar-body">
 
       <!-- ── Always visible: Run Settings ──────────────────────── -->
+      <!-- No mode toggle — this public demo always runs the one (redaction +
+           heuristic scoring) pipeline. There is nothing for a visitor to
+           choose, plug a key into, or exploit. -->
       <div class="field" id="run-mode-field">
-        <label>Run Mode</label>
-        <div class="toggle-row">
-          <button class="toggle-btn active" id="btn-stub"      onclick="setMode('stub')">Stub Demo</button>
-          <button class="toggle-btn"        id="btn-redaction" onclick="setMode('redaction_only')">Redaction Only</button>
-        </div>
-        <small id="mode-desc" style="font-size:10px;color:#6a9bbf;line-height:1.5;display:block;margin-top:6px">
-          Pure heuristic simulation — zero AWS calls, instant, free.
-        </small>
-        <small style="font-size:10px;color:#6a9bbf;line-height:1.5;display:block;margin-top:6px">
-          This is a demo-only deployment — no AWS or Anthropic API keys are ever
-          accepted from visitors. Scoring is always heuristic; only the redaction
-          stage differs between modes (see below).
+        <label>Demo Mode</label>
+        <small style="font-size:10px;color:#6a9bbf;line-height:1.5;display:block">
+          This public demo runs heuristic scoring plus a simulated PII-redaction
+          pass (local pattern matching) on every candidate — no AWS or
+          Anthropic API keys are ever used here.
         </small>
       </div>
 
@@ -674,26 +670,18 @@
 
 <script>
 // ── State ─────────────────────────────────────────────────────────────────────
-let mode             = 'stub';
+// Fixed — this public demo only ever runs one pipeline (redaction + heuristic
+// scoring), so there's no mode toggle for a visitor to pick from.
+const mode           = 'redaction_only';
 let allApps          = [];
 let decisions        = [];
 let presets          = {};
 let awardSensitivity = 'low';
-let realRedactionEnabled = true;
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   fetch('/api/applications').then(r=>r.json()).then(apps => { allApps=apps; renderAppList(apps); });
   fetch('/api/presets').then(r=>r.json()).then(p => { presets=p; });
-  fetch('/api/config').then(r=>r.json()).then(cfg => {
-    if (!cfg.real_redaction_enabled) {
-      realRedactionEnabled = false;
-      MODE_DESCRIPTIONS.redaction_only = 'Simulated redaction — local pattern matching (no AWS Bedrock call, zero cost) demonstrates the same before/after masking in the Redaction tab. Scoring still uses the free heuristic logic.';
-      const redactionBtn = document.getElementById('btn-redaction');
-      if (redactionBtn) redactionBtn.title = 'This deployment simulates redaction locally instead of calling real AWS Bedrock Guardrails, to avoid per-visitor AWS cost.';
-      if (mode === 'redaction_only') setMode('redaction_only'); // refresh the description text
-    }
-  }).catch(() => {});
   loadPastRuns();
 
   // Hide scroll hint once user scrolls the sidebar
@@ -729,20 +717,6 @@ function showSection(name) {
 function updateQuantWeight(val) {
   const pct = Math.round(parseFloat(val) * 100);
   document.getElementById('quant-val').textContent = pct + '%';
-}
-
-// ── Mode ──────────────────────────────────────────────────────────────────────
-const MODE_DESCRIPTIONS = {
-  stub: 'Pure heuristic simulation — zero AWS calls, instant, free.',
-  redaction_only: 'Real Amazon Bedrock Guardrails redaction (genuine AWS call, provable in the Redaction tab) — scoring still uses the free heuristic logic. No Claude call, no model cost.',
-};
-
-function setMode(m) {
-  mode = m;
-  document.getElementById('btn-stub').classList.toggle('active', m === 'stub');
-  document.getElementById('btn-redaction').classList.toggle('active', m === 'redaction_only');
-  const desc = document.getElementById('mode-desc');
-  if (desc) desc.textContent = MODE_DESCRIPTIONS[m] || '';
 }
 
 function setAwardSens(val, btn) {
@@ -1218,24 +1192,18 @@ function buildRedactionTab(d, appData) {
     return `<div class="empty-state" style="padding:32px 16px">
       <div class="icon" style="font-size:28px;opacity:.4">🔓</div>
       <p style="max-width:440px;line-height:1.6">
-        <strong>Stub Demo mode doesn't perform PII redaction.</strong><br>
-        No AWS or Bedrock calls happen in this mode — it's a pure heuristic simulation.
-        Switch to <strong>Redaction Only</strong> in the sidebar and re-run to see this
-        candidate's personal statement, psychological profile, specializations, and awards
-        actually redacted — no Claude call required for that mode.
+        <strong>This result has no redaction data.</strong><br>
+        It was recorded before this demo was locked to a single always-redacting
+        pipeline (or via a direct API call in Stub Demo mode, which skips
+        redaction entirely).
       </p>
     </div>`;
   }
 
-  const isStubEngine = r.engine === 'stub';
-  const engineBanner = isStubEngine
-    ? `<div style="margin-bottom:14px;padding:10px 12px;background:#fff8e1;border:1px solid #ffe082;border-radius:7px;font-size:12px;color:#8a6d00;line-height:1.5">
-        🧪 <strong>Simulated redaction</strong> — this deployment matches PII with local regex patterns instead of
-        calling real Amazon Bedrock Guardrails, so public visitors can see this demo with zero AWS cost.
-        The masking logic below (entity types, before/after) works the same way; it's just not a billed AWS call.
-      </div>`
-    : `<div style="margin-bottom:14px;padding:10px 12px;background:#e8f5e9;border:1px solid #a5d6a7;border-radius:7px;font-size:12px;color:#1b5e20;line-height:1.5">
-        ✅ <strong>Real Amazon Bedrock Guardrails call</strong> — the masking below reflects a genuine AWS API response.
+  const engineBanner = `<div style="margin-bottom:14px;padding:10px 12px;background:#fff8e1;border:1px solid #ffe082;border-radius:7px;font-size:12px;color:#8a6d00;line-height:1.5">
+        🧪 <strong>Simulated redaction</strong> — this demo matches PII with local regex patterns
+        rather than calling a real cloud PII-detection service, so it costs nothing to run.
+        The masking logic below (entity types, before/after) demonstrates the same idea.
       </div>`;
 
   const entityTags = Object.keys(r.entity_counts || {}).length
@@ -1302,7 +1270,7 @@ function buildRedactionTab(d, appData) {
         The real name is only reattached to this final decision record for admin display here — it was never sent to Claude.</div>
     </div>
     <div class="app-field" style="margin-bottom:14px">
-      <div class="app-field-label">Entities Detected &amp; Masked ${isStubEngine ? '(Simulated — local pattern matching)' : '(Amazon Bedrock Guardrails)'}</div>
+      <div class="app-field-label">Entities Detected &amp; Masked (Simulated — local pattern matching)</div>
       <div class="tag-list">${entityTags}${blockedTags}</div>
     </div>
     ${textRows}

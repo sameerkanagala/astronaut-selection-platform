@@ -2,28 +2,29 @@
 PII Redaction Layer
 ====================
 De-identifies an Application before any of its fields are placed into a
-prompt sent to Claude (or shown to the simulated Human Review Layer).
-Uses Amazon Bedrock Guardrails' standalone `ApplyGuardrail` API, which
-scans/masks text independent of any model invocation — this runs as a
-pure preprocessing step ahead of the 5-stage evaluation pipeline (see
-orchestrator.py), not as a side effect of a model call.
+prompt sent to Claude (or shown to the simulated Human Review Layer). This
+runs as a pure preprocessing step ahead of the 5-stage evaluation pipeline
+(see orchestrator.py), not as a side effect of a model call.
+
+This is a local, zero-cost, regex-based redaction pass — StubPIIRedactor
+below — not a real call to any third-party PII detection service. It's a
+heuristic demo aid, not a security control: it catches the PII shapes the
+demo dataset actually contains (a person's name introduced by a
+military/academic honorific, an email address, a phone number), but it
+will miss PII shapes outside those patterns.
 
 Design notes
 ------------
 - A structured `name` field is replaced deterministically with a
   non-identifying, stable placeholder tied to the pseudonymous candidate
-  id (e.g. "Candidate IEA-001"). There's no ambiguity about whether a
-  "name" field contains a name, so no need to spend a guardrail call on it.
+  id (e.g. "Candidate IEA-001").
 - Free-text fields (personal statement, evaluator psychological profile)
   can contain embedded PII that isn't obvious from the field itself — a
   reference to family, a home address, an email mentioned in passing.
-  These are run through the Bedrock Guardrails sensitive-information
-  filter, which masks matches with tags like {NAME} or {EMAIL}, or
-  blocks the field entirely for entity types configured as BLOCK.
+  These are scanned with local regex matching, which masks matches with
+  tags like {NAME} or {EMAIL}.
 - List fields (specializations, awards) are joined with an invisible
-  separator into a single guardrail call each, then split back into a
-  list — same trick used for extracurriculars/awards in the sibling
-  scholarship project, so a 10-item award list doesn't cost 10 API calls.
+  separator into a single pass each, then split back into a list.
 - Fields that are legitimate downstream inputs (flight_hours,
   physical_fitness_score, medical_clearance, advanced_degrees,
   prior_missions, age, nationality, stem_field, candidate_level,
@@ -32,17 +33,12 @@ Design notes
   and the Scoring Agent's rubric explicitly needs them to assess
   technical/physical readiness — redacting them would break the rubric,
   not just hide identity.
-- Known coverage gap: Bedrock Guardrails' built-in PII entity catalog
-  does NOT include an ORGANIZATION entity type, so an employer or unit
-  name mentioned in free text won't be masked by this alone.
 """
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
-
-import boto3
+from typing import Dict, List, Optional, Tuple
 
 from scholarship_eval.models import Application
 
@@ -50,8 +46,8 @@ from scholarship_eval.models import Application
 _TEXT_FIELDS = ["personal_statement", "psychological_profile"]
 _LIST_FIELDS = ["specializations", "awards"]
 
-# Invisible separator used to bundle list fields into a single guardrail
-# call, then split the masked result back into a list.
+# Invisible separator used to bundle list fields into a single pass,
+# then split the masked result back into a list.
 _JOIN_MARK = "\n⁣⁣⁣\n"
 
 
@@ -68,12 +64,10 @@ class RedactionReport:
     application_id: str
     findings: List[RedactionFinding] = field(default_factory=list)
     guardrail_intervened: bool = False
-    # "bedrock" (default) = a real ApplyGuardrail call produced this report.
-    # "stub" = StubPIIRedactor produced it via local regex matching, no AWS
-    # call at all. The frontend's Redaction tab reads this to label the
-    # result honestly rather than implying every visitor triggers billed
-    # AWS usage.
-    engine: str = "bedrock"
+    # Always "stub" — StubPIIRedactor (local regex matching, no AWS call)
+    # is the only redactor this app has. Kept as a field for compatibility
+    # with any previously saved result files that recorded it.
+    engine: str = "stub"
 
     def entity_counts(self) -> Dict[str, int]:
         counts: Dict[str, int] = {}
@@ -82,11 +76,9 @@ class RedactionReport:
         return counts
 
     def blocked_fields(self) -> List[str]:
-        """Fields where the guardrail's action was BLOCK rather than
-        ANONYMIZE. AWS's real API returns the per-entity action as a
-        past-tense string ("ANONYMIZED", "BLOCKED") rather than the
-        present-tense config-time verb — checking with startswith("BLOCK")
-        is robust to either form."""
+        """Fields where a finding's action was BLOCK rather than ANONYMIZE.
+        StubPIIRedactor only ever anonymizes, so this is always empty in
+        practice — kept for compatibility with the report shape."""
         return sorted({f.field for f in self.findings if f.action.upper().startswith("BLOCK")})
 
 
@@ -141,101 +133,14 @@ PERSONAL STATEMENT:
 """.strip()
 
 
-class PIIRedactor:
-    """Wraps Bedrock Guardrails' ApplyGuardrail to de-identify an Application."""
-
-    def __init__(self, guardrail_id: str, guardrail_version: str,
-                 region: str = "us-east-1", client: Any = None):
-        self.guardrail_id = guardrail_id
-        self.guardrail_version = guardrail_version
-        self.client = client or boto3.client("bedrock-runtime", region_name=region)
-
-    def redact(self, application: Application) -> Tuple[RedactedApplication, RedactionReport]:
-        report = RedactionReport(application_id=application.id)
-        report.findings.append(RedactionFinding(field="name", type="NAME", action="ANONYMIZE"))
-        placeholder_name = f"Candidate {application.id}"
-
-        raw_values: Dict[str, str] = {
-            "personal_statement": application.personal_statement or "",
-            "psychological_profile": application.psychological_profile or "",
-            "specializations": _JOIN_MARK.join(application.specializations or []),
-            "awards": _JOIN_MARK.join(application.awards or []),
-        }
-
-        # One ApplyGuardrail call per field, rather than bundling every
-        # field into a single call — see pii_redaction.py in the sibling
-        # scholarship project for the full reasoning (empty `outputs`
-        # means nothing was flagged, not an echo of the input).
-        masked_values: Dict[str, str] = {}
-        for name, text in raw_values.items():
-            if not text.strip():
-                masked_values[name] = text
-                continue
-
-            response = self.client.apply_guardrail(
-                guardrailIdentifier=self.guardrail_id,
-                guardrailVersion=self.guardrail_version,
-                source="INPUT",
-                outputScope="FULL",
-                content=[{"text": {"text": text}}],
-            )
-
-            if response.get("action") == "GUARDRAIL_INTERVENED":
-                report.guardrail_intervened = True
-                outputs = response.get("outputs", [])
-                masked_values[name] = outputs[0]["text"] if outputs else text
-            else:
-                masked_values[name] = text
-
-            for assessment in response.get("assessments", []):
-                pii_entities = assessment.get("sensitiveInformationPolicy", {}).get("piiEntities", [])
-                for entity in pii_entities:
-                    if entity.get("detected"):
-                        report.findings.append(RedactionFinding(
-                            field=name, type=entity["type"], action=entity["action"],
-                            match=entity.get("match", "")))
-
-        redacted = RedactedApplication(
-            id=application.id,
-            name=placeholder_name,
-            age=application.age,
-            nationality=application.nationality,
-            stem_field=application.stem_field,
-            candidate_level=application.candidate_level,
-            military_background=application.military_background,
-            flight_hours=application.flight_hours,
-            advanced_degrees=application.advanced_degrees,
-            physical_fitness_score=application.physical_fitness_score,
-            medical_clearance=application.medical_clearance,
-            specializations=[s for s in masked_values["specializations"].split(_JOIN_MARK) if s],
-            prior_missions=application.prior_missions,
-            awards=[s for s in masked_values["awards"].split(_JOIN_MARK) if s],
-            personal_statement=masked_values["personal_statement"],
-            psychological_profile=masked_values["psychological_profile"],
-        )
-        return redacted, report
-
-
 class StubPIIRedactor:
-    """Zero-cost stand-in for PIIRedactor, used when ALLOW_REAL_REDACTION is
-    false (see app.py) — e.g. on a public deployment where Redaction Only
-    mode has no password gate and would otherwise let any visitor trigger
-    real, billed Amazon Bedrock Guardrails calls just by clicking a button.
-
-    Detects the same three PII shapes the demo dataset actually contains —
+    """Local, zero-cost PII redaction — no AWS or third-party call of any
+    kind. Detects the three PII shapes the demo dataset actually contains:
     a person's name introduced by a military/academic honorific, an email
-    address, a phone number — using local regex matching instead of a real
-    ApplyGuardrail call. Same public `.redact()` interface and return
-    shapes as PIIRedactor, so the rest of the pipeline and the UI don't
-    need to know which one ran. The only difference downstream is
-    RedactionReport.engine ("stub" instead of "bedrock"), which the
-    frontend's Redaction tab uses to label the result honestly rather than
-    implying a real AWS call happened.
+    address, a phone number.
 
     This is a heuristic demo aid, not a security control — it will miss
-    PII shapes outside these three patterns. It exists purely so a public
-    visitor can see a convincing before/after redaction demo without
-    costing the site owner anything.
+    PII shapes outside these three patterns.
     """
 
     _EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")

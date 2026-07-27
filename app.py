@@ -3,14 +3,16 @@ Astronaut Candidate Selection Platform — Flask Web Application
 ================================================================
 Background-thread + polling architecture (no SSE, avoids proxy buffering
 on Railway/Heroku). This is a demo-only deployment — no Anthropic API key
-is ever accepted from a visitor. Two run modes:
+is ever accepted from a visitor, and no model or third-party PII-detection
+service is ever called. (S3 is still used for storing applications/results
+— see data_loader.py — that's the only AWS service this app touches.)
 
-  Stub Demo       — pure heuristic simulation. No AWS calls of any kind.
-  Redaction Only  — real Amazon Bedrock Guardrails redaction (stage 0),
-                    then the same free stub heuristics for scoring. No
-                    Claude call, no Anthropic API key needed. Falls back
-                    to a zero-cost simulated redaction on this deployment
-                    (see ALLOW_REAL_REDACTION below).
+The UI runs a single fixed pipeline: local, zero-cost PII redaction
+(stage 0, regex-based — see pii_redaction.py), then free heuristic
+scoring/analysis for the rest of the pipeline. `/api/evaluate` still
+accepts a `mode` field and supports a second, purely-heuristic mode with
+no redaction stage (used only if called directly, e.g. from a script) —
+the frontend always sends `mode: "redaction_only"`.
 
 Applications and results are stored in a real AWS S3 bucket dedicated to
 this project (data_loader.py), with a local applications/results folder
@@ -38,17 +40,6 @@ from scholarship_eval.models   import DecisionOutcome, ReviewType
 from scholarship_eval.policy   import PRESETS, policy_from_dict, policy_to_dict
 
 app = Flask(__name__)
-
-REGION = os.environ.get("AWS_REGION", "us-east-1")
-
-# Set ALLOW_REAL_REDACTION=false on a public deployment to make Redaction
-# Only fall back to StubPIIRedactor — a local regex-based stand-in with
-# zero AWS calls and zero cost — instead of a real Amazon Bedrock
-# Guardrails call. Redaction Only has no password gate on this project, so
-# without this flag any visitor could trigger real, billed AWS usage just
-# by clicking a button. Defaults to enabled (unset = "true") so
-# local/private use is unaffected. Stub Demo never touches this either way.
-REAL_REDACTION_ENABLED = os.environ.get("ALLOW_REAL_REDACTION", "true").strip().lower() != "false"
 
 # ── In-memory job store ───────────────────────────────────────────────────────
 # { job_id: { "status": "running"|"done"|"error", "queue": deque, "lock": Lock } }
@@ -144,11 +135,12 @@ def decision_to_dict(decision) -> dict:
              "timestamp": s.timestamp, "metadata": s.metadata}
             for s in decision.audit_trail
         ],
-        # Only populated in Redaction Only mode (Stub Demo never touches
-        # Bedrock, so this is None there — templates/index.html's Redaction
-        # tab checks for that and explains why).
+        # Only populated when redaction ran (older saved result files from
+        # before this demo was locked to a single always-redacting pipeline
+        # may lack it — templates/index.html's Redaction tab checks for
+        # that and explains why).
         "redaction": {
-            "engine": getattr(rr, "engine", "bedrock"),
+            "engine": getattr(rr, "engine", "stub"),
             "entity_counts": rr.entity_counts(),
             "blocked_fields": rr.blocked_fields(),
             "guardrail_intervened": rr.guardrail_intervened,
@@ -188,49 +180,23 @@ def calibration_to_dict(report) -> dict:
 
 # ── Background worker ─────────────────────────────────────────────────────────
 
-def _build_redactor():
-    """Real Bedrock Guardrails PIIRedactor if ALLOW_REAL_REDACTION permits
-    it, else the zero-cost StubPIIRedactor (see REAL_REDACTION_ENABLED)."""
-    from pii_redaction import PIIRedactor, StubPIIRedactor
-
-    if not REAL_REDACTION_ENABLED:
-        return StubPIIRedactor()
-
-    guardrail_id = os.environ["GUARDRAIL_ID"]
-    guardrail_version = os.environ["GUARDRAIL_VERSION"]
-    return PIIRedactor(guardrail_id=guardrail_id, guardrail_version=guardrail_version, region=REGION)
-
-
 def _build_redaction_only_orchestrator():
-    """Constructed lazily, only when a job actually runs. Only needs
-    GUARDRAIL_ID/GUARDRAIL_VERSION/AWS credentials when real redaction is
-    enabled — no Anthropic API key, since this mode never calls Claude."""
+    """Constructed lazily, only when a job actually runs."""
+    from pii_redaction import StubPIIRedactor
     from redaction_only_orchestrator import RedactionOnlyOrchestrator
 
-    redactor = _build_redactor()
-    return RedactionOnlyOrchestrator(redactor=redactor, verbose=False)
+    return RedactionOnlyOrchestrator(redactor=StubPIIRedactor(), verbose=False)
 
 
 def _run_job(job_id: str, mode: str, selected: list, policy):
     decision_dicts = []
     try:
         if mode == "redaction_only":
-            try:
-                orchestrator = _build_redaction_only_orchestrator()
-                orchestrator.policy = policy
-                orchestrator.scoring_agent.high_threshold = policy.confidence_high
-                orchestrator.scoring_agent.low_threshold = policy.confidence_low
-                orchestrator.scoring_agent.quant_weight = getattr(policy, "quant_weight", 0.50)
-            except KeyError as missing:
-                _push(job_id, "error",
-                      message=f"Redaction Only mode is missing required server configuration: {missing}. "
-                              f"GUARDRAIL_ID / GUARDRAIL_VERSION / AWS credentials must be set as "
-                              f"environment variables on this service (no Anthropic API key needed "
-                              f"for this mode).")
-                with _jobs_lock:
-                    if job_id in _jobs:
-                        _jobs[job_id]["status"] = "error"
-                return
+            orchestrator = _build_redaction_only_orchestrator()
+            orchestrator.policy = policy
+            orchestrator.scoring_agent.high_threshold = policy.confidence_high
+            orchestrator.scoring_agent.low_threshold = policy.confidence_low
+            orchestrator.scoring_agent.quant_weight = getattr(policy, "quant_weight", 0.50)
         else:
             from scholarship_eval.stub_agents import StubOrchestrator
             orchestrator = StubOrchestrator(verbose=False, policy=policy)
@@ -316,16 +282,6 @@ def list_applications():
 @app.route("/api/presets")
 def get_presets():
     return jsonify({k: policy_to_dict(v) for k, v in PRESETS.items()})
-
-
-@app.route("/api/config")
-def get_config():
-    """Frontend feature flag: whether Redaction Only actually calls real
-    Amazon Bedrock Guardrails or falls back to the zero-cost StubPIIRedactor
-    on this deployment."""
-    return jsonify({
-        "real_redaction_enabled": REAL_REDACTION_ENABLED,
-    })
 
 
 @app.route("/api/evaluate", methods=["POST"])
