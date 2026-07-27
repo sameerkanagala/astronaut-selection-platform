@@ -2,15 +2,15 @@
 Astronaut Candidate Selection Platform — Flask Web Application
 ================================================================
 Background-thread + polling architecture (no SSE, avoids proxy buffering
-on Railway/Heroku). Three run modes:
+on Railway/Heroku). This is a demo-only deployment — no Anthropic API key
+is ever accepted from a visitor. Two run modes:
 
   Stub Demo       — pure heuristic simulation. No AWS calls of any kind.
   Redaction Only  — real Amazon Bedrock Guardrails redaction (stage 0),
                     then the same free stub heuristics for scoring. No
-                    Claude call, no Anthropic API key needed.
-  Live Claude     — real Bedrock Guardrails redaction, then real Claude
-                    calls via the direct Anthropic API using a
-                    user-supplied API key (unchanged from before).
+                    Claude call, no Anthropic API key needed. Falls back
+                    to a zero-cost simulated redaction on this deployment
+                    (see ALLOW_REAL_REDACTION below).
 
 Applications and results are stored in a real AWS S3 bucket dedicated to
 this project (data_loader.py), with a local applications/results folder
@@ -41,21 +41,13 @@ app = Flask(__name__)
 
 REGION = os.environ.get("AWS_REGION", "us-east-1")
 
-# Set ALLOW_LIVE_MODE=false on a public deployment to hide Live Claude mode
-# from the UI and reject it server-side, so visitors are never invited to
-# paste their own Anthropic API key into an unfamiliar public site. Stub
-# Demo and Redaction Only are unaffected — neither needs a visitor-supplied
-# key. Leave unset (default: enabled) for local/private use.
-LIVE_MODE_ENABLED = os.environ.get("ALLOW_LIVE_MODE", "true").strip().lower() != "false"
-
 # Set ALLOW_REAL_REDACTION=false on a public deployment to make Redaction
-# Only (and Live Claude's redaction stage) fall back to StubPIIRedactor — a
-# local regex-based stand-in with zero AWS calls and zero cost — instead of
-# a real Amazon Bedrock Guardrails call. Redaction Only has no password
-# gate on this project, so without this flag any visitor could trigger
-# real, billed AWS usage just by clicking a button. Defaults to enabled
-# (unset = "true") so local/private use is unaffected. Stub Demo never
-# touches this either way.
+# Only fall back to StubPIIRedactor — a local regex-based stand-in with
+# zero AWS calls and zero cost — instead of a real Amazon Bedrock
+# Guardrails call. Redaction Only has no password gate on this project, so
+# without this flag any visitor could trigger real, billed AWS usage just
+# by clicking a button. Defaults to enabled (unset = "true") so
+# local/private use is unaffected. Stub Demo never touches this either way.
 REAL_REDACTION_ENABLED = os.environ.get("ALLOW_REAL_REDACTION", "true").strip().lower() != "false"
 
 # ── In-memory job store ───────────────────────────────────────────────────────
@@ -152,9 +144,9 @@ def decision_to_dict(decision) -> dict:
              "timestamp": s.timestamp, "metadata": s.metadata}
             for s in decision.audit_trail
         ],
-        # Only populated in Redaction Only / Live Claude modes (Stub Demo
-        # never touches Bedrock, so this is None there — templates/index.html's
-        # Redaction tab checks for that and explains why).
+        # Only populated in Redaction Only mode (Stub Demo never touches
+        # Bedrock, so this is None there — templates/index.html's Redaction
+        # tab checks for that and explains why).
         "redaction": {
             "engine": getattr(rr, "engine", "bedrock"),
             "entity_counts": rr.entity_counts(),
@@ -209,53 +201,20 @@ def _build_redactor():
     return PIIRedactor(guardrail_id=guardrail_id, guardrail_version=guardrail_version, region=REGION)
 
 
-def _build_live_orchestrator(api_key: str, model: str):
-    """Constructed lazily, only when a "live" job actually runs — Stub Demo
-    and Redaction Only must work without an Anthropic API key configured."""
-    from anthropic import Anthropic
-    from scholarship_eval.orchestrator import Orchestrator
-
-    client = Anthropic(api_key=api_key)
-    redactor = _build_redactor()
-    return Orchestrator(client=client, model=model, redactor=redactor, verbose=False)
-
-
 def _build_redaction_only_orchestrator():
-    """Constructed lazily, same reasoning as _build_live_orchestrator. Only
-    needs GUARDRAIL_ID/GUARDRAIL_VERSION/AWS credentials when real redaction
-    is enabled — no Anthropic API key, since this mode never calls Claude."""
+    """Constructed lazily, only when a job actually runs. Only needs
+    GUARDRAIL_ID/GUARDRAIL_VERSION/AWS credentials when real redaction is
+    enabled — no Anthropic API key, since this mode never calls Claude."""
     from redaction_only_orchestrator import RedactionOnlyOrchestrator
 
     redactor = _build_redactor()
     return RedactionOnlyOrchestrator(redactor=redactor, verbose=False)
 
 
-def _run_job(job_id: str, mode: str, api_key: str, model: str, selected: list, policy):
+def _run_job(job_id: str, mode: str, selected: list, policy):
     decision_dicts = []
     try:
-        if mode == "live":
-            if not api_key:
-                _push(job_id, "error", message="Anthropic API key required for Live Claude mode.")
-                with _jobs_lock:
-                    if job_id in _jobs:
-                        _jobs[job_id]["status"] = "error"
-                return
-            try:
-                orchestrator = _build_live_orchestrator(api_key, model)
-                orchestrator.policy = policy
-                orchestrator.scoring_agent.high_threshold = policy.confidence_high
-                orchestrator.scoring_agent.low_threshold = policy.confidence_low
-            except KeyError as missing:
-                _push(job_id, "error",
-                      message=f"Live mode is missing required server configuration: {missing}. "
-                              f"GUARDRAIL_ID / GUARDRAIL_VERSION / AWS credentials must be set as "
-                              f"environment variables on this service (redaction runs on the server's "
-                              f"AWS credentials, separately from your Anthropic API key).")
-                with _jobs_lock:
-                    if job_id in _jobs:
-                        _jobs[job_id]["status"] = "error"
-                return
-        elif mode == "redaction_only":
+        if mode == "redaction_only":
             try:
                 orchestrator = _build_redaction_only_orchestrator()
                 orchestrator.policy = policy
@@ -361,12 +320,10 @@ def get_presets():
 
 @app.route("/api/config")
 def get_config():
-    """Frontend feature flags: whether Live Claude mode (visitor-supplied
-    Anthropic API key) is exposed, and whether Redaction Only actually
-    calls real Amazon Bedrock Guardrails or falls back to the zero-cost
-    StubPIIRedactor on this deployment."""
+    """Frontend feature flag: whether Redaction Only actually calls real
+    Amazon Bedrock Guardrails or falls back to the zero-cost StubPIIRedactor
+    on this deployment."""
     return jsonify({
-        "live_mode_enabled": LIVE_MODE_ENABLED,
         "real_redaction_enabled": REAL_REDACTION_ENABLED,
     })
 
@@ -376,14 +333,7 @@ def evaluate():
     """Start a background evaluation job. Returns {job_id} immediately."""
     body    = request.json or {}
     mode    = body.get("mode", "stub")
-    api_key = body.get("api_key", "").strip()
-    model   = body.get("model", "claude-haiku-4-5-20251001")
     app_ids = body.get("app_ids", None)  # None = all applications
-
-    if mode == "live" and not LIVE_MODE_ENABLED:
-        return jsonify({"error": "Live Claude mode is disabled on this deployment. "
-                                  "Run the app locally with your own Anthropic API key "
-                                  "to use it."}), 403
 
     # Build policy
     policy_data = body.get("policy", {})
@@ -407,7 +357,7 @@ def evaluate():
     job_id = _new_job()
     t = threading.Thread(
         target=_run_job,
-        args=(job_id, mode, api_key, model, selected, policy),
+        args=(job_id, mode, selected, policy),
         daemon=True,
     )
     t.start()

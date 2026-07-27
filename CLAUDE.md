@@ -15,9 +15,8 @@ python app.py
 # Run with Redaction Only mode (real Bedrock Guardrails, no Claude call)
 GUARDRAIL_ID=... GUARDRAIL_VERSION=... AWS_REGION=us-east-1 python app.py
 
-# Run with Live Claude mode (real Bedrock Guardrails + real Claude)
-# Same env vars as above; the Anthropic API key is entered in the UI per-run,
-# not set as a server env var — Live mode needs both.
+# This is a demo-only app: there is no mode that calls a real LLM, and no
+# Anthropic API key is ever accepted from a visitor.
 
 # Production server (matches Railway deploy)
 gunicorn app:app --bind 0.0.0.0:5000 --workers 1 --threads 4 --timeout 300
@@ -39,9 +38,8 @@ this project (not shared with any sibling project).
 |---|---|
 | `S3_BUCKET_NAME` | Dedicated S3 bucket for this project's `applications/` and `results/` |
 | `AWS_REGION` | Region for both S3 and Bedrock Guardrails (default `us-east-1`) |
-| `GUARDRAIL_ID` / `GUARDRAIL_VERSION` | Bedrock Guardrail used by `PIIRedactor` (required for Redaction Only and Live modes) |
-| `ALLOW_LIVE_MODE` | Set to `false` on a public deployment to hide Live Claude mode in the UI and reject it server-side (`/api/evaluate` returns 403), so visitors are never invited to paste their own Anthropic API key into an unfamiliar public site. Defaults to enabled (unset = `true`). Stub Demo and Redaction Only are unaffected. |
-| `ALLOW_REAL_REDACTION` | Set to `false` on a public deployment to make Redaction Only (and Live Claude's redaction stage) fall back to `StubPIIRedactor` — a local regex-based stand-in with zero AWS calls and zero cost — instead of a real Amazon Bedrock Guardrails call. Redaction Only has no password gate, so without this any visitor could trigger real, billed AWS usage just by clicking a button. Defaults to enabled (unset = `true`). The Redaction tab labels results "Simulated" vs "Real Amazon Bedrock Guardrails call" accordingly, driven by `/api/config`'s `real_redaction_enabled` flag. |
+| `GUARDRAIL_ID` / `GUARDRAIL_VERSION` | Bedrock Guardrail used by `PIIRedactor` (required for Redaction Only mode) |
+| `ALLOW_REAL_REDACTION` | Set to `false` on a public deployment to make Redaction Only fall back to `StubPIIRedactor` — a local regex-based stand-in with zero AWS calls and zero cost — instead of a real Amazon Bedrock Guardrails call. Redaction Only has no password gate, so without this any visitor could trigger real, billed AWS usage just by clicking a button. Defaults to enabled (unset = `true`). The Redaction tab labels results "Simulated" vs "Real Amazon Bedrock Guardrails call" accordingly, driven by `/api/config`'s `real_redaction_enabled` flag. |
 
 AWS credentials themselves come from the environment/instance role in the
 usual boto3 way (`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` or an
@@ -83,26 +81,18 @@ then the same 5-stage evaluation pipeline as before:
 
 ### Run modes
 
-Three modes, selectable in the sidebar (and, more narrowly, from the
-Funnel Dashboard's own Run control):
+Two modes, selectable in the sidebar (and, more narrowly, from the
+Funnel Dashboard's own Run control). This is a demo-only app — there is
+no mode that calls a real LLM, and no Anthropic API key is ever accepted
+from a visitor:
 
 - **Stub Demo** — pure heuristic simulation. Zero AWS or Anthropic calls.
 - **Redaction Only** — a genuine Bedrock Guardrails call redacts every
   candidate (provable in the per-candidate Redaction tab), but scoring
   still uses the free heuristic logic. No Claude call, no model cost.
-  Falls back to `StubPIIRedactor` when `ALLOW_REAL_REDACTION=false`.
-
-When both `ALLOW_LIVE_MODE=false` and `ALLOW_REAL_REDACTION=false` (the
-public deployment's permanent state), the Run Mode toggle itself is hidden
-in `templates/index.html` — Stub Demo and Redaction Only would otherwise
-be functionally identical (same heuristic scoring either way, and no real
-AWS call happens in either case), so the UI just always runs the fuller
-(simulated) redaction demo instead of offering a choice with no real
-difference. See the `bothDisabled` branch of the `/api/config` handler in
-`index.html`.
-- **Live Claude** — real Bedrock Guardrails redaction, then a real Claude
-  call (direct Anthropic API, using the API key entered in the sidebar —
-  not `AnthropicBedrock`; only the redaction step touches AWS/Bedrock).
+  Falls back to `StubPIIRedactor` when `ALLOW_REAL_REDACTION=false` (the
+  public deployment's permanent state), and the Redaction tab labels
+  which one ran ("Simulated" vs "Real Amazon Bedrock Guardrails call").
 
 ### Data layer
 
@@ -114,9 +104,11 @@ difference. See the `bothDisabled` branch of the `/api/config` handler in
   (carries an `engine` field: `"bedrock"` or `"stub"`), `RedactionFinding`.
 - `redaction_only_orchestrator.py` — `RedactionOnlyOrchestrator` (real
   redaction + stub scoring, used by Redaction Only mode).
-- `scholarship_eval/orchestrator.py` — `Orchestrator` (stage-0 redaction is
-  optional via the `redactor=` param; `None` in Stub Demo, a real
-  `PIIRedactor` in Live mode).
+- `scholarship_eval/orchestrator.py` — `Orchestrator` (a real-Claude-calling
+  orchestrator originally used by the now-removed Live Claude mode). No
+  longer imported anywhere in `app.py`; kept only as reference code. Safe
+  to delete along with `analysis_agent.py`/`scoring_agent.py` (the
+  Claude-calling agents it used) if you want the repo fully lean.
 - `applications/app_001.json` … `app_010.json` — the 10 candidate
   applications (formerly `scholarship_eval/mock_data.py`, now superseded
   by these JSON files + `data_loader.py`; `mock_data.py` is left in place
@@ -129,7 +121,7 @@ POST /api/evaluate  → background thread → {job_id}
 GET  /api/poll/<id> → drain event queue → {status, events[]}
 GET  /api/results   → list result files (from S3 or local)
 GET  /api/results/<filename> → load a past run
-GET  /api/config     → {"live_mode_enabled": bool, "real_redaction_enabled": bool} — drives the UI's Live Claude visibility and Redaction tab labeling
+GET  /api/config     → {"real_redaction_enabled": bool} — drives the Redaction tab labeling
 GET  /dashboard      → Funnel Dashboard (Chart.js, 6 tabs)
 GET  /about          → narrative project overview
 ```
@@ -145,7 +137,7 @@ proxies.
   Run Evaluation always visible up top, a single "Configure" dropdown below
   that swaps between settings sections (Selection Policy, Confidence &
   Routing, Decision Sensitivity, Signal Hierarchy, Disagreement Controls,
-  Oversight, Past Runs) one at a time, 3-way run-mode toggle, per-candidate
+  Oversight, Past Runs) one at a time, 2-way run-mode toggle, per-candidate
   audit panel with 6 tabs (Application, Redaction, Rubric, Scores, Signals,
   Audit). The Redaction tab labels each result "Simulated" or "Real Amazon
   Bedrock Guardrails call" based on `/api/config`'s `real_redaction_enabled`.

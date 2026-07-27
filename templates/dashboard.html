@@ -203,7 +203,7 @@ table.dt tr.exp td{background:var(--teal-bg)}
   </select>
   <div class="mode-toggle">
     <button class="mode-btn active" id="btn-stub" onclick="setMode('stub')">Stub</button>
-    <button class="mode-btn" id="btn-live" onclick="setMode('live')">Live</button>
+    <button class="mode-btn" id="btn-redaction" onclick="setMode('redaction_only')">Redaction Only</button>
   </div>
   <button class="run-btn" id="run-btn" onclick="startEval()">▶ Run Evaluation</button>
   <select class="preset-sel" id="past-runs-sel" onchange="loadPastRunDash(this.value)"
@@ -537,13 +537,9 @@ const DIM_LABELS = { academic:'Technical', financial:'Physical/Med', leadership:
     if (d) { decisions = JSON.parse(d); if (c) calibration = JSON.parse(c); refreshAll(); }
   } catch(e) {}
   fetch('/api/config').then(r=>r.json()).then(cfg => {
-    if (!cfg.live_mode_enabled) {
-      const liveBtn = document.getElementById('btn-live');
-      if (liveBtn) {
-        liveBtn.classList.add('hidden');
-        liveBtn.title = 'Live Claude mode is disabled on this public deployment.';
-      }
-      if (mode === 'live') setMode('stub');
+    if (!cfg.real_redaction_enabled) {
+      const redactionBtn = document.getElementById('btn-redaction');
+      if (redactionBtn) redactionBtn.title = 'This deployment simulates redaction locally instead of calling real AWS Bedrock Guardrails, to avoid per-visitor AWS cost.';
     }
   }).catch(() => {});
   loadPastRunsDash();
@@ -566,7 +562,7 @@ function switchTab(id, el) {
 function setMode(m) {
   mode = m;
   document.getElementById('btn-stub').classList.toggle('active', m === 'stub');
-  document.getElementById('btn-live').classList.toggle('active', m === 'live');
+  document.getElementById('btn-redaction').classList.toggle('active', m === 'redaction_only');
 }
 
 async function startEval() {

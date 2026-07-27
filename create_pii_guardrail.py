@@ -1,7 +1,7 @@
 """
 One-time setup: creates the dedicated Bedrock Guardrail used by PIIRedactor
-to de-identify astronaut candidates before Redaction Only / Live Claude
-modes reach the scoring stage. Independent of any guardrail created for
+to de-identify astronaut candidates before Redaction Only mode reaches the
+scoring stage. Independent of any guardrail created for
 sibling projects (bedrock_poc, mcp-scholarship-eval-platform) — this one
 belongs only to astronaut-selection-platform.
 

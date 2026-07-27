@@ -54,17 +54,16 @@ export GUARDRAIL_VERSION=<version>
 ## 5. Run locally
 
 ```bash
-# Stub Demo — zero AWS/Anthropic calls, no env vars needed
+# Stub Demo — zero AWS calls, no env vars needed
 python app.py
 
 # Redaction Only — real Bedrock Guardrails, no Claude call
 # (requires GUARDRAIL_ID / GUARDRAIL_VERSION / AWS credentials above)
 python app.py
-
-# Live Claude — real Bedrock Guardrails + real Claude
-# Same env vars, plus enter your Anthropic API key in the sidebar per-run
-python app.py
 ```
+
+This is a demo-only application — there is no mode that calls a real LLM,
+and no Anthropic API key is ever accepted from a user.
 
 Open `http://localhost:5000`. Open `/dashboard` for the Funnel Dashboard,
 or `/about` for the project overview.
@@ -73,9 +72,7 @@ or `/about` for the project overview.
 
 | Setting | Description | Default |
 |---|---|---|
-| Run Mode | Stub Demo / Redaction Only / Live Claude | Stub Demo |
-| API Key | Anthropic API key (Live mode only) | — |
-| Model | Haiku / Sonnet / Opus (Live mode only) | Haiku |
+| Run Mode | Stub Demo / Redaction Only | Stub Demo |
 | Preset | Initial Screening / Mission Assignment / Deep Space | Initial Screening |
 | Candidates | Select any subset of the 10 candidates | All |
 
@@ -92,14 +89,7 @@ or `/about` for the project overview.
    ```
    (AWS credentials via `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`, or
    an attached IAM role.)
-4. Live Claude mode needs no server-side Anthropic key — each user enters
-   their own API key in the sidebar when they run it.
-5. **Public deployment:** since this is a public demo, set
-   `ALLOW_LIVE_MODE = false` so visitors never see the option to paste in
-   their own Anthropic API key. Stub Demo and Redaction Only stay fully
-   available (neither needs one). Leave it unset when running locally for
-   yourself to keep Live Claude mode available.
-6. **Redaction Only has no password gate**, so on a public deployment also
+4. **Redaction Only has no password gate**, so on a public deployment also
    set `ALLOW_REAL_REDACTION = false`. This makes Redaction Only fall back
    to `StubPIIRedactor` — a local regex-based stand-in with zero AWS calls
    — instead of a real, billed Amazon Bedrock Guardrails call per visitor
@@ -112,7 +102,7 @@ or `/about` for the project overview.
 ## Project Structure
 
 ```
-├── app.py                          # Flask app: job queue, 3 run modes, results
+├── app.py                          # Flask app: job queue, 2 run modes, results
 ├── data_loader.py                  # Dual-backend loader (S3 / local)
 ├── pii_redaction.py                # PIIRedactor (Bedrock Guardrails)
 ├── redaction_only_orchestrator.py  # Redaction Only mode orchestrator

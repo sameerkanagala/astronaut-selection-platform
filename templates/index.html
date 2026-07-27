@@ -370,40 +370,15 @@
         <div class="toggle-row">
           <button class="toggle-btn active" id="btn-stub"      onclick="setMode('stub')">Stub Demo</button>
           <button class="toggle-btn"        id="btn-redaction" onclick="setMode('redaction_only')">Redaction Only</button>
-          <button class="toggle-btn"        id="btn-live"      onclick="setMode('live')">Live Claude</button>
         </div>
         <small id="mode-desc" style="font-size:10px;color:#6a9bbf;line-height:1.5;display:block;margin-top:6px">
           Pure heuristic simulation — zero AWS calls, instant, free.
         </small>
-      </div>
-      <!-- Shown instead of the Run Mode toggle when both Live Claude and real
-           Bedrock redaction are disabled (ALLOW_LIVE_MODE=false and
-           ALLOW_REAL_REDACTION=false) — on a public deployment there's no
-           meaningful choice left between "no redaction" and "redaction demo",
-           so every visitor just gets the fuller (simulated) experience. -->
-      <div class="field hidden" id="mode-locked-note">
-        <label>Demo Mode</label>
-        <small style="font-size:10px;color:#6a9bbf;line-height:1.5;display:block">
-          This public demo runs heuristic scoring plus a simulated PII-redaction
-          pass (local pattern matching) on every candidate — no AWS or
-          Anthropic API keys are ever used here.
-        </small>
-      </div>
-      <div class="field hidden" id="apikey-field">
-        <label>Anthropic API Key</label>
-        <input type="password" id="api-key" placeholder="sk-ant-api03-…">
         <small style="font-size:10px;color:#6a9bbf;line-height:1.5;display:block;margin-top:6px">
-          Only this key is sent to Anthropic directly. PII redaction (stage 0) runs separately,
-          on this server's own AWS credentials via Amazon Bedrock Guardrails.
+          This is a demo-only deployment — no AWS or Anthropic API keys are ever
+          accepted from visitors. Scoring is always heuristic; only the redaction
+          stage differs between modes (see below).
         </small>
-      </div>
-      <div class="field hidden" id="model-field">
-        <label>Model</label>
-        <select id="model-select">
-          <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 (fastest)</option>
-          <option value="claude-sonnet-4-6">Claude Sonnet 4.6 (balanced)</option>
-          <option value="claude-opus-4-6">Claude Opus 4.6 (most capable)</option>
-        </select>
       </div>
 
       <!-- ── Always visible: Candidates + Run (moved above settings so it's
@@ -714,32 +689,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!cfg.real_redaction_enabled) {
       realRedactionEnabled = false;
       MODE_DESCRIPTIONS.redaction_only = 'Simulated redaction — local pattern matching (no AWS Bedrock call, zero cost) demonstrates the same before/after masking in the Redaction tab. Scoring still uses the free heuristic logic.';
-    }
-
-    const bothDisabled = !cfg.live_mode_enabled && !cfg.real_redaction_enabled;
-
-    if (bothDisabled) {
-      // No real AWS or Anthropic calls are ever possible on this deployment,
-      // so Stub Demo vs Redaction Only is no longer a meaningful choice —
-      // collapse to a single always-on (simulated) redaction demo instead of
-      // showing a 3-way toggle where two options behave identically.
-      const modeField = document.getElementById('run-mode-field');
-      if (modeField) modeField.classList.add('hidden');
-      const lockedNote = document.getElementById('mode-locked-note');
-      if (lockedNote) lockedNote.classList.remove('hidden');
-      setMode('redaction_only');
-      return;
-    }
-
-    if (!cfg.live_mode_enabled) {
-      const liveBtn = document.getElementById('btn-live');
-      if (liveBtn) {
-        liveBtn.classList.add('hidden');
-        liveBtn.title = 'Live Claude mode is disabled on this public deployment.';
-      }
-      if (mode === 'live') setMode('stub');
-    }
-    if (!cfg.real_redaction_enabled) {
       const redactionBtn = document.getElementById('btn-redaction');
       if (redactionBtn) redactionBtn.title = 'This deployment simulates redaction locally instead of calling real AWS Bedrock Guardrails, to avoid per-visitor AWS cost.';
       if (mode === 'redaction_only') setMode('redaction_only'); // refresh the description text
@@ -786,16 +735,12 @@ function updateQuantWeight(val) {
 const MODE_DESCRIPTIONS = {
   stub: 'Pure heuristic simulation — zero AWS calls, instant, free.',
   redaction_only: 'Real Amazon Bedrock Guardrails redaction (genuine AWS call, provable in the Redaction tab) — scoring still uses the free heuristic logic. No Claude call, no model cost.',
-  live: 'Real Bedrock Guardrails redaction, then real Claude scoring via your Anthropic API key.',
 };
 
 function setMode(m) {
   mode = m;
   document.getElementById('btn-stub').classList.toggle('active', m === 'stub');
   document.getElementById('btn-redaction').classList.toggle('active', m === 'redaction_only');
-  document.getElementById('btn-live').classList.toggle('active', m === 'live');
-  document.getElementById('apikey-field').classList.toggle('hidden', m !== 'live');
-  document.getElementById('model-field').classList.toggle('hidden', m !== 'live');
   const desc = document.getElementById('mode-desc');
   if (desc) desc.textContent = MODE_DESCRIPTIONS[m] || '';
 }
@@ -893,9 +838,6 @@ let _pollInterval = null;
 function runEvaluation() {
   const ids = getSelectedIds();
   if (!ids.length) { alert('Please select at least one candidate.'); return; }
-  if (mode === 'live' && !document.getElementById('api-key').value.trim()) {
-    alert('Please enter your Anthropic API key for live mode.'); return;
-  }
 
   decisions = [];
   resetUI(ids.length);
@@ -903,8 +845,6 @@ function runEvaluation() {
 
   const payload = {
     mode,
-    api_key: document.getElementById('api-key').value.trim(),
-    model:   document.getElementById('model-select').value,
     app_ids: ids,
     policy:  getPolicy(),
   };

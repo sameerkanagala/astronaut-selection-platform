@@ -282,7 +282,7 @@ footer a { color: #5baee8; text-decoration: none; }
       <div class="step-num" style="background:#2e75b6"><div class="num">2</div>Scoring</div>
       <div class="step-body">
         <div class="step-name">Scoring Agent</div>
-        <div class="step-desc">Receives the Evidence object and applies a 100-point rubric (0–25 per dimension). Produces an AI recommendation, a confidence score (0.0–1.0), and a reasoning string. In live mode this is a real LLM call. In stub mode it uses a deterministic formula — demos run without any API key.</div>
+        <div class="step-desc">Receives the Evidence object and applies a 100-point rubric (0–25 per dimension). Produces an AI recommendation, a confidence score (0.0–1.0), and a reasoning string. This public demo always uses a deterministic heuristic formula — no LLM call, no API key, ever.</div>
       </div>
     </div>
     <div class="pipeline-step">
@@ -494,9 +494,9 @@ footer a { color: #5baee8; text-decoration: none; }
     <div class="ctrl">
       <div class="ctrl-label">
         <h4>Mode</h4>
-        <div class="ctrl-range">Stub / Redaction Only / Live</div>
+        <div class="ctrl-range">Stub Demo / Redaction Only</div>
       </div>
-      <div class="ctrl-desc">Stub: deterministic agents, no AWS or API calls, fast and reproducible. Redaction Only: a genuine Amazon Bedrock Guardrails call de-identifies each candidate, but scoring still uses the free heuristic — no model cost. Live: real Bedrock Guardrails redaction, then a real Claude call for scoring. Architecture identical across all three — only what actually gets called changes.</div>
+      <div class="ctrl-desc">Stub Demo: deterministic agents, no AWS calls, fast and reproducible. Redaction Only: a genuine Amazon Bedrock Guardrails call de-identifies each candidate, but scoring still uses the same free heuristic — no model cost. Scoring is always heuristic in this demo; only the redaction stage differs between modes.</div>
     </div>
   </div>
 </section>
