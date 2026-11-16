@@ -300,21 +300,6 @@
     .always-section { border-top:1px solid rgba(255,255,255,.10);
                       margin-top:4px; padding-top:10px; }
 
-    /* ── Past Runs ───────────────────────────────────────────── */
-    .past-runs-list { max-height: 180px; overflow-y: auto; }
-    .past-runs-list::-webkit-scrollbar { width: 4px; }
-    .past-runs-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,.2); border-radius: 2px; }
-    .past-run-item { display:flex; flex-direction:column; gap:1px; width:100%; text-align:left;
-                     padding:6px 8px; margin-bottom:4px; border-radius:6px;
-                     border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.04);
-                     cursor:pointer; transition:background .15s, border-color .15s; }
-    .past-run-item:hover { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.15); }
-    .past-run-item.active { background: rgba(46,117,182,.25); border-color: rgba(46,117,182,.7); }
-    .past-run-name { font-size: 11px; font-weight: 600; color: #c8d8ea;
-                     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .past-run-meta { font-size: 10px; color: #6a8fb0; }
-    .past-runs-empty { font-size: 11px; color: #5a85a8; text-align: center; padding: 8px 0; }
-
     /* ── Utility ──────────────────────────────────────────────── */
     .hidden { display: none !important; }
     .spinner { display: inline-block; width: 14px; height: 14px;
@@ -395,40 +380,36 @@
         </button>
       </div>
 
-      <!-- ── Configure: one dropdown, one visible section at a time ──── -->
+      <!-- ── Preset (always visible, above Configure) ──── -->
       <div class="field" style="border-top:1px solid rgba(255,255,255,.10);margin-top:14px;padding-top:12px">
+        <label>Preset</label>
+        <select id="preset-select" onchange="applyPreset(this.value)">
+          <option value="initial_screening">Initial Candidate Screening</option>
+          <option value="mission_assignment">Mission Assignment</option>
+          <option value="deep_space">Deep Space / Long-Duration</option>
+          <option value="custom">Custom</option>
+        </select>
+      </div>
+      <div class="field">
+        <small style="font-size:10px;color:#6a9bbf;line-height:1.5;display:block" id="preset-desc">
+          Large candidate pool. AI automation encouraged for clear-cut cases.
+        </small>
+      </div>
+
+      <!-- ── Configure: one dropdown, one visible section at a time ──── -->
+      <div class="field">
         <label>Configure</label>
         <select id="settings-section-select" onchange="showSection(this.value)">
-          <option value="policy">🏛 Selection Policy</option>
           <option value="confidence">🎯 Confidence &amp; Routing</option>
           <option value="sensitivity">⚡ Decision Sensitivity</option>
           <option value="hierarchy">⚖ Signal Hierarchy</option>
           <option value="disagreement">🔀 Disagreement Controls</option>
           <option value="oversight">🛡 Oversight</option>
-          <option value="pastruns">📁 Past Runs</option>
         </select>
       </div>
 
-      <!-- 1. Selection Policy (shown by default) -->
-      <div class="settings-section" id="section-policy">
-        <div class="field">
-          <label>Preset</label>
-          <select id="preset-select" onchange="applyPreset(this.value)">
-            <option value="initial_screening">Initial Candidate Screening</option>
-            <option value="mission_assignment">Mission Assignment</option>
-            <option value="deep_space">Deep Space / Long-Duration</option>
-            <option value="custom">Custom</option>
-          </select>
-        </div>
-        <div class="field">
-          <small style="font-size:10px;color:#6a9bbf;line-height:1.5;display:block" id="preset-desc">
-            Large candidate pool. AI automation encouraged for clear-cut cases.
-          </small>
-        </div>
-      </div>
-
-      <!-- 2. Confidence & Routing -->
-      <div class="settings-section hidden" id="section-confidence">
+      <!-- 1. Confidence & Routing (shown by default) -->
+      <div class="settings-section" id="section-confidence">
         <div class="field">
           <label>High Confidence <span class="slider-val" id="high-val">0.78</span></label>
           <div class="slider-wrap">
@@ -571,17 +552,6 @@
         </div>
       </div>
 
-      <!-- 7. Past Runs -->
-      <div class="settings-section hidden" id="section-pastruns">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <span style="font-size:10px;color:#6a9bbf">Click a run to reload it</span>
-          <button onclick="loadPastRuns()" style="background:none;border:none;color:#5a9fd4;font-size:12px;cursor:pointer;padding:0" title="Refresh list">↻</button>
-        </div>
-        <div class="past-runs-list" id="past-runs-list">
-          <div class="past-runs-empty">No past runs yet</div>
-        </div>
-      </div>
-
     </div><!-- /sidebar-body -->
     <div class="scroll-hint" id="scroll-hint"><span>▾</span> Scroll for candidates &amp; Run</div>
   </aside>
@@ -682,7 +652,6 @@ let awardSensitivity = 'low';
 document.addEventListener('DOMContentLoaded', () => {
   fetch('/api/applications').then(r=>r.json()).then(apps => { allApps=apps; renderAppList(apps); });
   fetch('/api/presets').then(r=>r.json()).then(p => { presets=p; });
-  loadPastRuns();
 
   // Hide scroll hint once user scrolls the sidebar
   const sidebar = document.querySelector('.sidebar');
@@ -889,7 +858,6 @@ function handleEvent(ev) {
       try {
         sessionStorage.setItem('dash_d', JSON.stringify(decisions));
       } catch(e) {}
-      loadPastRuns();
       break;
     case 'error':
       setStatus('error', 'Error occurred');
@@ -1525,81 +1493,6 @@ function setRunBtn(loading) {
   btn.disabled = loading;
   document.getElementById('run-icon').innerHTML = loading ? '<span class="spinner"></span>' : '▶';
   document.getElementById('run-label').textContent = loading ? 'Evaluating…' : 'Run Evaluation';
-}
-
-// ── Past Runs ─────────────────────────────────────────────────────────────────
-let _activePastRun = null;
-
-function loadPastRuns() {
-  fetch('/api/results')
-    .then(r => r.json())
-    .then(files => {
-      const list = document.getElementById('past-runs-list');
-      if (!list) return;
-      if (!files.length) {
-        list.innerHTML = '<div class="past-runs-empty">No past runs yet. Run an evaluation to see results here.</div>';
-        return;
-      }
-      list.innerHTML = files.map(f => {
-        const ts = f.timestamp ? new Date(f.timestamp).toLocaleString() : f.filename;
-        const kb = (f.size_bytes / 1024).toFixed(1);
-        const active = _activePastRun === f.filename ? ' active' : '';
-        return `<div class="past-run-item${active}" onclick="loadPastRun('${f.filename}')">
-          <span class="past-run-name" title="${f.filename}">${ts}</span>
-          <span class="past-run-meta">${f.applicant_count} candidate${f.applicant_count !== 1 ? 's' : ''} · ${kb} KB</span>
-        </div>`;
-      }).join('');
-    })
-    .catch(() => {});
-}
-
-function loadPastRun(filename) {
-  _activePastRun = filename;
-  setStatus('running', 'Loading…');
-  fetch('/api/results/' + encodeURIComponent(filename))
-    .then(r => r.json())
-    .then(data => {
-      if (data.error) { setStatus('error', data.error); return; }
-      loadFromData(data, filename);
-      loadPastRuns(); // re-render sidebar to highlight active run
-    })
-    .catch(() => setStatus('error', 'Failed to load run'));
-}
-
-function loadFromData(data, filename) {
-  const decs  = data.decisions  || [];
-  const calib = data.calibration;
-
-  document.getElementById('empty-state').classList.add('hidden');
-  document.getElementById('results-wrap').classList.remove('hidden');
-  document.getElementById('progress-section').classList.add('hidden');
-  document.getElementById('table-section').classList.add('hidden');
-  document.getElementById('cal-section').classList.add('hidden');
-  document.getElementById('results-tbody').innerHTML = '';
-  document.getElementById('stats-row').innerHTML     = '';
-  document.getElementById('cal-stats').innerHTML     = '';
-  document.getElementById('cal-insights').innerHTML  = '';
-  document.getElementById('cal-records').innerHTML   = '';
-
-  decisions = decs;
-  decs.forEach(d => addTableRow(d));
-
-  if (decs.length) {
-    document.getElementById('table-section').classList.remove('hidden');
-    updateStats();
-  }
-  if (calib) renderCalibration(calib);
-
-  // Sync to sessionStorage so the Funnel Dashboard opens this run too
-  try {
-    sessionStorage.setItem('dash_d', JSON.stringify(decs));
-    if (calib) sessionStorage.setItem('dash_c', JSON.stringify(calib));
-  } catch(e) {}
-
-  const ts = data.timestamp ? new Date(data.timestamp).toLocaleString() : (filename || 'past run');
-  setStatus('done', `Loaded · ${decs.length} decisions`);
-  document.getElementById('topbar-sub').textContent =
-    `Past run — ${ts} — ${decs.length} candidate${decs.length !== 1 ? 's' : ''}`;
 }
 </script>
 </body>

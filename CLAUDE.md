@@ -52,8 +52,18 @@ results/results_<timestamp>_<job_id>.json   ← one file per evaluation run
 
 ### Viewing past runs
 
-Use the `/api/results` endpoint, the Past Runs accordion in the sidebar, or
-the Past Runs dropdown on `/dashboard`.
+Use the `/api/results` endpoint or the Past Runs dropdown on `/dashboard`.
+
+### Caching (S3 mode)
+
+`data_loader.py` keeps an in-memory applications cache (5-min TTL; a miss
+lists `applications/` and fetches all objects concurrently) and caches the
+`list_results()` output. `save_results` writes `applicant-count`, `run-id`
+and `timestamp` as S3 object metadata so listing needs only a HeadObject per
+file (cached per key+ETag), not a body download; older files without that
+metadata fall back to a one-time body read. `save_results` clears the
+results-list cache. Note application ids (`IEA-001`) differ from their
+object keys (`applications/app_001.json`).
 
 ## Architecture
 
@@ -130,10 +140,11 @@ proxies.
 ### Frontend
 
 - `templates/index.html` — single-page evaluator. Sidebar has Candidates +
-  Run Evaluation always visible up top, a single "Configure" dropdown below
-  that swaps between settings sections (Selection Policy, Confidence &
-  Routing, Decision Sensitivity, Signal Hierarchy, Disagreement Controls,
-  Oversight, Past Runs) one at a time, no run-mode toggle (fixed demo mode), per-candidate
+  Run Evaluation always visible up top, then the Preset field (with its
+  description), then a single "Configure" dropdown that swaps between
+  settings sections (Confidence & Routing — the default, Decision
+  Sensitivity, Signal Hierarchy, Disagreement Controls, Oversight) one at a
+  time, no run-mode toggle (fixed demo mode), per-candidate
   audit panel with 6 tabs (Application, Redaction, Rubric, Scores, Signals,
   Audit). The Redaction tab always labels results "Simulated" (local
   pattern matching, no AWS call).
