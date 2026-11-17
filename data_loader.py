@@ -14,6 +14,7 @@ import os
 import re
 import threading
 import time
+from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional
 
@@ -31,6 +32,36 @@ AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 CACHE_TTL_SECONDS = 300
 FETCH_WORKERS = 8
 
+# Retention: only this many saved runs are kept (older ones are pruned after
+# each save) and only this many are ever listed. Override with MAX_SAVED_RUNS.
+try:
+    MAX_SAVED_RUNS = max(1, int(os.environ.get("MAX_SAVED_RUNS", "8")))
+except ValueError:
+    MAX_SAVED_RUNS = 8
+
+# Safety: prune_results() refuses to delete more than this many files in one
+# call (logs an error and deletes nothing instead).
+MAX_PRUNE_PER_CALL = 20
+
+# The one definition of "a saved run file": exactly what save_results()
+# writes, directly under results/. Anything else under results/ (other
+# tools' outputs, nested keys, _index.json, ...) is never listed, loaded
+# by name, or deleted.
+RUN_FILE_RE = re.compile(r"^results_\d{8}_\d{6}_[A-Za-z0-9-]+\.json$")
+
+
+def _is_run_filename(name: str) -> bool:
+    return bool(RUN_FILE_RE.fullmatch(name))
+
+
+def _run_key_filename(key: str) -> Optional[str]:
+    """Filename if `key` is a top-level run file under results/, else None."""
+    if not key.startswith("results/"):
+        return None
+    name = key[len("results/"):]
+    return name if _is_run_filename(name) else None
+
+
 _s3_client = None
 
 # Applications cache (S3 mode only): id -> Application, plus the time it was
@@ -44,6 +75,10 @@ _apps_listed_at: float = 0.0
 # per-object entries never need expiring.
 _results_list_cache: Optional[tuple] = None  # (list, built_at)
 _results_meta_cache: Dict[tuple, dict] = {}
+
+# Parsed results by filename (LRU, capped at MAX_SAVED_RUNS). Saved results
+# never change, so entries only leave by eviction or pruning.
+_result_cache: "OrderedDict[str, dict]" = OrderedDict()
 
 
 def _s3():
@@ -172,7 +207,7 @@ def save_results(job_id: str, decision_dicts: list, calibration: Optional[dict] 
             "decisions": decision_dicts,
             "calibration": calibration,
         },
-        indent=2,
+        separators=(",", ":"),
     )
 
     if S3_BUCKET_NAME:
@@ -186,11 +221,18 @@ def save_results(job_id: str, decision_dicts: list, calibration: Optional[dict] 
                 "timestamp": now.isoformat(),
             },
         )
-        _clear_results_cache()
     else:
         os.makedirs("results", exist_ok=True)
         with open(os.path.join("results", filename), "w") as f:
             f.write(payload)
+
+    _clear_results_cache()
+    # Seed the parse cache so opening this run needs no storage read.
+    _cache_result(filename, json.loads(payload))
+    try:
+        prune_results()
+    except Exception:
+        log.warning("Pruning old results failed (the save itself succeeded)", exc_info=True)
 
     return filename
 
@@ -206,16 +248,113 @@ def _normalize_meta(meta: dict, fallback_timestamp: str) -> dict:
     }
 
 
+def _cache_result(filename: str, data: dict) -> None:
+    with _cache_lock:
+        _result_cache[filename] = data
+        _result_cache.move_to_end(filename)
+        while len(_result_cache) > MAX_SAVED_RUNS:
+            _result_cache.popitem(last=False)
+
+
 def load_result(filename: str) -> dict:
     """Load one specific saved results file (as returned by list_results())
-    by its filename, from S3 if configured, else the local results/ folder."""
-    if S3_BUCKET_NAME:
-        body = _s3().get_object(Bucket=S3_BUCKET_NAME, Key=f"results/{filename}")["Body"].read()
-        return json.loads(body)
+    by its filename, from S3 if configured, else the local results/ folder.
+    Parsed results are cached in memory (they never change). Raises
+    FileNotFoundError if the file doesn't exist (e.g. it was pruned) and
+    ValueError if the name isn't a run filename (also blocks ../ traversal)."""
+    if not _is_run_filename(filename):
+        raise ValueError("Invalid result filename")
+    with _cache_lock:
+        hit = _result_cache.get(filename)
+        if hit is not None:
+            _result_cache.move_to_end(filename)
+            return hit
 
-    path = os.path.join("results", filename)
-    with open(path) as f:
-        return json.load(f)
+    if S3_BUCKET_NAME:
+        try:
+            body = _s3().get_object(Bucket=S3_BUCKET_NAME, Key=f"results/{filename}")["Body"].read()
+        except ClientError as e:
+            if e.response.get("Error", {}).get("Code") in ("NoSuchKey", "404"):
+                raise FileNotFoundError(filename) from e
+            raise
+        data = json.loads(body)
+    else:
+        with open(os.path.join("results", filename)) as f:
+            data = json.load(f)
+
+    _cache_result(filename, data)
+    return data
+
+
+def latest_result() -> Optional[dict]:
+    """The newest saved run's full data (plus its "filename"), or None."""
+    for item in list_results():
+        try:
+            return {**load_result(item["filename"]), "filename": item["filename"]}
+        except FileNotFoundError:
+            continue  # pruned between listing and loading
+    return None
+
+
+def prune_results() -> int:
+    """Delete all but the newest MAX_SAVED_RUNS run files (see RUN_FILE_RE).
+    Other files under results/ are never touched. Refuses (logs an error,
+    deletes nothing) if more than MAX_PRUNE_PER_CALL files would go. Returns
+    how many were deleted. Raises on storage errors; save_results() catches
+    and logs them."""
+    if S3_BUCKET_NAME:
+        runs = []  # (filename, original S3 key)
+        paginator = _s3().get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=S3_BUCKET_NAME, Prefix="results/"):
+            for obj in page.get("Contents", []):
+                name = _run_key_filename(obj["Key"])
+                if name:
+                    runs.append((name, obj["Key"]))
+    else:
+        folder = "results"
+        if not os.path.isdir(folder):
+            return 0
+        runs = [(n, os.path.join(folder, n)) for n in os.listdir(folder)
+                if _is_run_filename(n) and os.path.isfile(os.path.join(folder, n))]
+
+    runs.sort(key=lambda r: r[0], reverse=True)
+    doomed = runs[MAX_SAVED_RUNS:]
+    if not doomed:
+        return 0
+    if len(doomed) > MAX_PRUNE_PER_CALL:
+        log.error("Refusing to prune %d result files (limit %d per call); "
+                  "deleting nothing. Check results/ and MAX_SAVED_RUNS.",
+                  len(doomed), MAX_PRUNE_PER_CALL)
+        return 0
+
+    deleted = []
+    if S3_BUCKET_NAME:
+        # Keys are the ones S3 returned, not rebuilt from the filename.
+        resp = _s3().delete_objects(
+            Bucket=S3_BUCKET_NAME,
+            Delete={"Objects": [{"Key": key} for _, key in doomed], "Quiet": True},
+        )
+        failed = {e["Key"] for e in resp.get("Errors", [])}
+        for e in resp.get("Errors", []):
+            log.warning("Could not delete %s: %s %s", e.get("Key"), e.get("Code"), e.get("Message"))
+        deleted = [name for name, key in doomed if key not in failed]
+    else:
+        for name, path in doomed:
+            try:
+                os.remove(path)
+                deleted.append(name)
+            except OSError:
+                log.warning("Could not delete %s", path, exc_info=True)
+
+    if deleted:
+        gone = set(deleted)
+        with _cache_lock:
+            for n in gone:
+                _result_cache.pop(n, None)
+            for k in [k for k in _results_meta_cache if k[0].rsplit("/", 1)[-1] in gone]:
+                del _results_meta_cache[k]
+        _clear_results_cache()
+    return len(deleted)
 
 
 def _clear_results_cache():
@@ -284,8 +423,11 @@ def list_results() -> List[dict]:
         paginator = _s3().get_paginator("list_objects_v2")
         for page in paginator.paginate(Bucket=S3_BUCKET_NAME, Prefix="results/"):
             for obj in page.get("Contents", []):
-                if obj["Key"].endswith(".json"):
+                if _run_key_filename(obj["Key"]):
                     objs.append(obj)
+        # Only the newest MAX_SAVED_RUNS are listed, so only fetch those.
+        objs.sort(key=lambda o: o["Key"], reverse=True)
+        objs = objs[:MAX_SAVED_RUNS]
         with ThreadPoolExecutor(max_workers=FETCH_WORKERS) as pool:
             metas = list(pool.map(_result_meta_from_s3, objs))
         items = [
@@ -301,9 +443,8 @@ def list_results() -> List[dict]:
     if not os.path.isdir(folder):
         return []
     items = []
-    for fname in sorted(os.listdir(folder), reverse=True):
-        if not fname.endswith(".json"):
-            continue
+    names = sorted((n for n in os.listdir(folder) if _is_run_filename(n)), reverse=True)
+    for fname in names[:MAX_SAVED_RUNS]:
         path = os.path.join(folder, fname)
         meta = {}
         try:

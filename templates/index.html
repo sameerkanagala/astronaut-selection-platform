@@ -567,7 +567,7 @@
         <div class="status-dot"></div>
         <span id="status-text">Ready</span>
       </div>
-      <a href="/dashboard" target="_blank" style="margin-left:12px;padding:5px 12px;
+      <a href="/dashboard" id="dashboard-link" target="_blank" style="margin-left:12px;padding:5px 12px;
         background:#0097b2;color:#fff;border-radius:5px;font-size:12px;font-weight:600;
         text-decoration:none;white-space:nowrap">📊 Funnel Dashboard</a>
       <a href="/about" target="_blank" style="margin-left:8px;padding:5px 12px;
@@ -849,6 +849,11 @@ function handleEvent(ev) {
     case 'calibration':
       renderCalibration(ev.report);
       try { sessionStorage.setItem('dash_c', JSON.stringify(ev.report)); } catch(e) {}
+      break;
+    case 'saved':
+      // sessionStorage isn't shared with the new tab, so pass the run by name.
+      document.getElementById('dashboard-link').href =
+        '/dashboard?run=' + encodeURIComponent(ev.filename);
       break;
     case 'done':
       setStatus('done', `Done — ${decisions.length} evaluated`);

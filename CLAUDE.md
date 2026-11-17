@@ -54,11 +54,45 @@ results/results_<timestamp>_<job_id>.json   ← one file per evaluation run
 
 Use the `/api/results` endpoint or the Past Runs dropdown on `/dashboard`.
 
+**Retention:** only the newest `MAX_SAVED_RUNS` runs (default 8, env var of
+the same name) are kept. After every successful `save_results()`, older
+result files are deleted (S3: `DeleteObjects`; local: file removal).
+Pruning failures are logged and never fail the save or the run.
+`/api/results` never returns more than `MAX_SAVED_RUNS` entries. "Newest" is
+by filename (`results_<UTC timestamp>_<job>.json`), so two runs saved within
+the same second are ordered arbitrarily. Result files are written as compact
+JSON; older indented files still load.
+
+**Only run files are ever touched.** A run file is a top-level
+`results/results_<8 digits>_<6 digits>_<id>.json` (`RUN_FILE_RE` in
+`data_loader.py`, matching what `save_results()` writes). Anything else under
+`results/` (other tools' outputs, nested keys, `_index.json`, ...) is never
+listed, counted toward the cap, loaded by name, or deleted. Delete keys are the
+original S3 keys. `load_result()` rejects non-matching names with a 400 (this
+also blocks `../` traversal). `prune_results()` refuses to delete more than
+`MAX_PRUNE_PER_CALL` (20) files in one call: it logs an error and deletes
+nothing, so a bucket with a large backlog needs manual cleanup first.
+
+**IAM:** pruning needs `s3:DeleteObject` on `results/*` in addition to
+`s3:GetObject`/`s3:PutObject`/`s3:ListBucket`. (Without it, pruning logs a
+warning and old runs accumulate; they are still hidden from the listing.)
+
+**Funnel Dashboard on open:** the evaluator's "Funnel Dashboard" link opens
+in a new tab, which does not inherit `sessionStorage`, so after a run
+the link is set to `/dashboard?run=<saved filename>`. `dashboard.html` shows,
+in order: (a) the `?run=` run; (b) a run in `sessionStorage`; (c) the newest
+saved run from `GET /api/results/latest` (full run data plus `filename`, or
+404 when there are none). If `?run=` names a pruned file it shows "This run
+is no longer available" and falls back to the latest run. Picking a pruned
+run in the dropdown shows the same message.
+
 ### Caching (S3 mode)
 
 `data_loader.py` keeps an in-memory applications cache (5-min TTL; a miss
-lists `applications/` and fetches all objects concurrently) and caches the
-`list_results()` output. `save_results` writes `applicant-count`, `run-id`
+lists `applications/` and fetches all objects concurrently), caches the
+`list_results()` output, and caches parsed results by filename in
+`load_result()` (LRU, capped at `MAX_SAVED_RUNS`; `save_results` seeds it with
+the run just saved). `save_results` writes `applicant-count`, `run-id`
 and `timestamp` as S3 object metadata so listing needs only a HeadObject per
 file (cached per key+ETag), not a body download; older files without that
 metadata fall back to a one-time body read. `save_results` clears the
@@ -127,6 +161,7 @@ API key is ever accepted from a visitor:
 POST /api/evaluate  → background thread → {job_id}
 GET  /api/poll/<id> → drain event queue → {status, events[]}
 GET  /api/results   → list result files (from S3 or local)
+GET  /api/results/latest   → newest run (full data), 404 if none
 GET  /api/results/<filename> → load a past run
 GET  /dashboard      → Funnel Dashboard (Chart.js, 6 tabs)
 GET  /about          → narrative project overview

@@ -335,6 +335,15 @@ def list_results():
     return jsonify(data_loader.list_results())
 
 
+@app.route("/api/results/latest")
+def get_latest_result():
+    """Full data of the newest saved run (plus its filename), or 404."""
+    data = data_loader.latest_result()
+    if data is None:
+        return jsonify({"error": "No saved runs yet"}), 404
+    return jsonify(data)
+
+
 @app.route("/api/results/<path:filename>")
 def get_result(filename):
     try:

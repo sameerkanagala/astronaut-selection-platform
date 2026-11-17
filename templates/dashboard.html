@@ -61,6 +61,7 @@ select.preset-sel option{background:#1e2b3c}
   margin-bottom:14px;display:flex;align-items:center;gap:8px}
 .status-strip.running{background:var(--teal-bg);border:1px solid #b2e4ed;color:#0a6678}
 .status-strip.done{background:var(--green-bg);border:1px solid #a0d8b8;color:var(--green)}
+.status-strip.warn{background:#fffbeb;border:1px solid #f3d98b;color:#8a5a00}
 .status-strip.error{background:var(--red-bg);border:1px solid #f0a0a0;color:var(--red)}
 .spin{display:inline-block;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -527,13 +528,36 @@ const DIM_LABELS = { academic:'Technical', financial:'Physical/Med', leadership:
 // ════════════════════════════════════════════════════════════════════════
 // BOOTSTRAP
 // ════════════════════════════════════════════════════════════════════════
-(function init() {
-  try {
-    const d = sessionStorage.getItem('dash_d');
-    const c = sessionStorage.getItem('dash_c');
-    if (d) { decisions = JSON.parse(d); if (c) calibration = JSON.parse(c); refreshAll(); }
-  } catch(e) {}
+// Which run to show on open, in order:
+//  (a) ?run=<filename> (the link from the evaluator, which opens in a new tab
+//      where sessionStorage is empty)
+//  (b) a run in sessionStorage (this tab's own run)
+//  (c) the newest saved run, via /api/results/latest
+(async function init() {
   loadPastRunsDash();
+  let notice = '';
+
+  const wanted = new URLSearchParams(location.search).get('run');
+  if (wanted) {
+    const r = await fetchRun('/api/results/' + encodeURIComponent(wanted));
+    if (r.data) { showRun(r.data, 'Your run', wanted); return; }
+    notice = r.status === 404 ? RUN_GONE : 'Could not load this run';
+  } else {
+    try {
+      const d = sessionStorage.getItem('dash_d');
+      const c = sessionStorage.getItem('dash_c');
+      if (d) {
+        decisions = JSON.parse(d); if (c) calibration = JSON.parse(c);
+        refreshAll();
+        showStrip('done', `✓ Your run — ${decisions.length} candidates`);
+        return;
+      }
+    } catch(e) {}
+  }
+
+  const latest = await fetchRun('/api/results/latest');
+  if (latest.data) { showRun(latest.data, 'Latest run', latest.data.filename, notice); return; }
+  if (notice) showStrip('warn', notice);
 })();
 
 // ════════════════════════════════════════════════════════════════════════
@@ -1316,31 +1340,54 @@ function loadPastRunsDash() {
     .catch(() => {});
 }
 
-function loadPastRunDash(filename) {
+const RUN_GONE = 'This run is no longer available';
+
+// GET a run; resolves to {data} on success or {status, error} on failure.
+async function fetchRun(url) {
+  try {
+    const r = await fetch(url);
+    const j = await r.json().catch(() => ({}));
+    if (r.ok && !j.error) return { data: j };
+    return { status: r.status, error: j.error };
+  } catch (e) {
+    return { status: 0 };
+  }
+}
+
+// Render a loaded run and say which one it is in the status strip.
+function showRun(data, label, filename, notice) {
+  decisions = data.decisions || [];
+  calibration = data.calibration || null;
+  drillFilter = {}; drillExpanded = {};
+  destroyAll();
+  resetKPIs();
+  hideDrills();
+  if (decisions.length) refreshAll();
+  const ts = data.timestamp ? new Date(data.timestamp).toLocaleString() : (filename || '');
+  const msg = `✓ ${label} — ${ts} — ${decisions.length} candidates`;
+  if (notice) showStrip('warn', `${notice} — showing the latest run instead. ${msg}`);
+  else showStrip('done', msg);
+  // Keep sessionStorage in sync so page reloads preserve the view
+  try {
+    sessionStorage.setItem('dash_d', JSON.stringify(decisions));
+    if (calibration) sessionStorage.setItem('dash_c', JSON.stringify(calibration));
+    else sessionStorage.removeItem('dash_c');
+  } catch(e) {}
+}
+
+async function loadPastRunDash(filename) {
   if (!filename) return;
   // Reset the select so it can be re-selected
   document.getElementById('past-runs-sel').value = '';
   showStrip('running', '⏳ Loading past run…');
-  fetch('/api/results/' + encodeURIComponent(filename))
-    .then(r => r.json())
-    .then(data => {
-      if (data.error) { showStrip('error', data.error); return; }
-      decisions = data.decisions || [];
-      calibration = data.calibration || null;
-      drillFilter = {}; drillExpanded = {};
-      destroyAll();
-      resetKPIs();
-      hideDrills();
-      if (decisions.length) refreshAll();
-      const ts = data.timestamp ? new Date(data.timestamp).toLocaleString() : filename;
-      showStrip('done', `✓ Past run loaded — ${ts} — ${decisions.length} candidates`);
-      // Keep sessionStorage in sync so page reloads preserve the view
-      try {
-        sessionStorage.setItem('dash_d', JSON.stringify(decisions));
-        if (calibration) sessionStorage.setItem('dash_c', JSON.stringify(calibration));
-      } catch(e) {}
-    })
-    .catch(() => showStrip('error', 'Failed to load past run'));
+  const r = await fetchRun('/api/results/' + encodeURIComponent(filename));
+  if (r.data) { showRun(r.data, 'Past run', filename); return; }
+  if (r.status === 404) {
+    showStrip('warn', RUN_GONE);
+    loadPastRunsDash(); // refresh the dropdown so the pruned run disappears
+  } else {
+    showStrip('error', 'Failed to load past run');
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════════
